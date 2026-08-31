@@ -1,0 +1,133 @@
+from __future__ import annotations
+
+import json
+import os
+import re
+import sys
+import unicodedata
+from pathlib import Path
+from typing import Any
+
+APP_NAME = "French Course AI"
+APP_SLUG = "FrenchCourseAI"
+TARGET_LANG = "fr"
+TARGET_LANG_NAME = "Français"
+VERSION = "1.0.0"
+HOME_ENV = "FCA_HOME"
+DB_FILENAME = "FrenchCourseAI.db"
+PACK_EXTENSION = ".fcapack"
+UI_LANGS = ("tr", "en", "fr")
+CEFR_LEVELS = ("A1", "A2", "B1", "B2", "C1")
+
+PACKAGE_DIR = Path(__file__).resolve().parent
+PROGRAM_DIR = PACKAGE_DIR.parent
+
+
+def _home() -> Path:
+    override = os.environ.get(HOME_ENV)
+    if override:
+        return Path(override)
+    if sys.platform.startswith("win"):
+        return Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming")) / APP_SLUG
+    return Path.home() / f".{APP_SLUG.lower()}"
+
+
+APP_HOME = _home()
+DATA_DIR = APP_HOME / "data"
+SETTINGS_DIR = APP_HOME / "settings"
+EXPORT_DIR = APP_HOME / "exports"
+DOWNLOAD_DIR = APP_HOME / "downloads"
+DB_PATH = DATA_DIR / DB_FILENAME
+SETTINGS_PATH = SETTINGS_DIR / "settings.json"
+RESOURCES_DIR = PROGRAM_DIR / "Resources"
+
+
+def ensure_dirs() -> None:
+    for path in (APP_HOME, DATA_DIR, SETTINGS_DIR, EXPORT_DIR, DOWNLOAD_DIR):
+        path.mkdir(parents=True, exist_ok=True)
+
+
+LMSTUDIO_BASE = "http://127.0.0.1:1234"
+NIM_BASE = "https://integrate.api.nvidia.com/v1"
+MODEL_PROFILES = {
+    "chat": ["qwen2.5-7b-instruct", "llama-3.1-8b-instruct"],
+    "grammar": ["qwen2.5-7b-instruct", "qwen2.5-14b-instruct"],
+    "translate": ["qwen2.5-7b-instruct", "gemma-2-9b-it"],
+    "correct": ["qwen2.5-7b-instruct", "qwen2.5-14b-instruct"],
+    "dialogue": ["qwen2.5-7b-instruct", "llama-3.1-8b-instruct"],
+    "vision": ["qwen2-vl-7b-instruct", "llava-v1.6-mistral-7b"],
+}
+
+DEFAULT_SETTINGS: dict[str, Any] = {
+    "ui_lang": "tr",
+    "theme": "dark",
+    "profile_id": None,
+    "daily_goal": 20,
+    "tts_enabled": True,
+    "tts_rate": 155,
+    "ai_enabled": True,
+    "ai_base": LMSTUDIO_BASE,
+    "ai_model": MODEL_PROFILES["chat"][0],
+    "nim_enabled": False,
+    "cefr": "A1",
+    "last_pdf": "",
+}
+
+PALETTES = {
+    "dark": {
+        "deep": "#0c1527", "bg": "#111c31", "panel": "#17243d", "card": "#1d2c48",
+        "hover": "#273959", "fg": "#fff9ef", "muted": "#aebbd0", "border": "#314463",
+        "accent": "#ff6b61", "accent2": "#3f75c7", "ok": "#62caa0", "warn": "#e9ad54",
+    },
+    "light": {
+        "deep": "#e8edf6", "bg": "#f5f7fb", "panel": "#ffffff", "card": "#edf1f8",
+        "hover": "#dfe6f2", "fg": "#17233c", "muted": "#62708a", "border": "#cbd5e5",
+        "accent": "#d8443d", "accent2": "#315eaa", "ok": "#247c5b", "warn": "#9a6713",
+    },
+}
+
+
+def load_settings() -> dict[str, Any]:
+    ensure_dirs()
+    result = dict(DEFAULT_SETTINGS)
+    try:
+        raw = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+        if isinstance(raw, dict):
+            result.update({k: raw[k] for k in DEFAULT_SETTINGS if k in raw})
+    except (OSError, ValueError, TypeError):
+        pass
+    if result.get("ui_lang") not in UI_LANGS:
+        result["ui_lang"] = "tr"
+    return result
+
+
+def save_settings(settings: dict[str, Any]) -> None:
+    """Persist known, non-secret settings with an atomic replace."""
+    ensure_dirs()
+    safe = {k: settings.get(k, v) for k, v in DEFAULT_SETTINGS.items()}
+    temporary = SETTINGS_PATH.with_suffix(".tmp")
+    temporary.write_text(json.dumps(safe, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(temporary, SETTINGS_PATH)
+
+
+_PUNCT = re.compile(r"[^\w\s\-']", re.UNICODE)
+
+
+def normalize_exact(text: str) -> str:
+    """Comparison form that deliberately preserves accents, apostrophes and case."""
+    value = unicodedata.normalize("NFC", text or "").strip()
+    value = value.replace("’", "'").replace("`", "'")
+    return re.sub(r"\s+", " ", value)
+
+
+def normalize_search(text: str) -> str:
+    """Search-only equivalence removes diacritics but keeps the stored spelling intact."""
+    value = normalize_exact(text).lower()
+    value = value.replace("œ", "oe").replace("æ", "ae")
+    value = "".join(ch for ch in unicodedata.normalize("NFD", value) if unicodedata.category(ch) != "Mn")
+    value = _PUNCT.sub(" ", value)
+    return re.sub(r"\s+", " ", value).strip()
+
+
+def answer_equal(given: str, expected: str) -> bool:
+    return normalize_exact(given) == normalize_exact(expected)
