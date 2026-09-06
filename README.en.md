@@ -9,6 +9,7 @@ French Course AI is an independent Windows desktop learning app built around loc
 - SM-2/Leitner spaced review, daily goal and streak
 - More than 160 built-in A1 words with noun article, gender and plural
 - French-Turkish-English dictionary, favorites and mistake drills
+- Bidirectional **French ↔ English dictionary** tab: 1,210+ built-in entries with gender and irregular plurals, automatic direction, accent/œ/elision-tolerant search, TTS, AI lookup, add-to-word-bank, CSV/TSV import/export
 - Cards, multiple choice, typing, listening and matching study modes
 - CEFR A1-C1 profiles and a scored exam engine
 - French spelling, accent and sound lab covering all requested diacritics, apostrophe/elision, liaison, silent finals, nasal vowels, key vowel contrasts, rhythm and dictation
@@ -62,7 +63,7 @@ Prompt and response text is not persisted. The token ledger stores only model, t
 python -m pytest -q
 ```
 
-The suite covers the window and all 17 pages, immediate/persistent language switching, complete i18n catalogs, migrations, 150+ seed words, SRS, study/exam flows, accent-insensitive search, strict accented spelling, Unicode CSV, offline AI behavior, token privacy and pack round-trips.
+The suite covers the window and all 18 pages, immediate/persistent language switching, complete i18n catalogs, migrations, 150+ seed words, the 1,210+-entry dictionary engine (two-way lookup, import/export, SQLite user entries), SRS, study/exam flows, accent-insensitive search, strict accented spelling, Unicode CSV, offline AI behavior, token privacy and pack round-trips.
 
 ## Structure
 
