@@ -10,7 +10,7 @@ from . import config as C
 from .seed_words import WORDS
 from .srs import SRSState
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 SCHEMA = """
 PRAGMA foreign_keys=ON;
@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS grammar_progress(
 CREATE TABLE IF NOT EXISTS dict_entries(
  id INTEGER PRIMARY KEY, headword TEXT NOT NULL, translation TEXT NOT NULL,
  pos TEXT NOT NULL DEFAULT '', extra TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '',
- source TEXT NOT NULL DEFAULT 'user', example TEXT NOT NULL DEFAULT '',
+ source TEXT NOT NULL DEFAULT 'user', example TEXT NOT NULL DEFAULT '', tr TEXT NOT NULL DEFAULT '',
  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(headword, translation));
 """
 
@@ -94,7 +94,8 @@ class Database:
             if name not in columns:
                 self.conn.execute(f"ALTER TABLE words ADD COLUMN {name} {sql_type}")
         dict_columns = {r[1] for r in self.conn.execute("PRAGMA table_info(dict_entries)")}
-        for name, sql_type in {"source": "TEXT NOT NULL DEFAULT 'user'", "example": "TEXT NOT NULL DEFAULT ''"}.items():
+        for name, sql_type in {"source": "TEXT NOT NULL DEFAULT 'user'", "example": "TEXT NOT NULL DEFAULT ''",
+                               "tr": "TEXT NOT NULL DEFAULT ''"}.items():
             if name not in dict_columns:
                 self.conn.execute(f"ALTER TABLE dict_entries ADD COLUMN {name} {sql_type}")
         self.conn.execute("INSERT INTO meta(key,value) VALUES('schema_version',?) "
@@ -322,16 +323,20 @@ class DictRepo:
     def count_by_source(self) -> dict[str, int]:
         return {r["source"]: int(r["n"]) for r in self.db.query("SELECT source, COUNT(*) n FROM dict_entries GROUP BY source")}
     def add_many(self, rows, source: str = SOURCE_USER) -> int:
-        """rows: (headword, translation[, pos[, extra[, note[, example]]]]). Returns the number actually inserted."""
+        """rows: (headword, translation[, pos[, extra[, note[, example[, tr]]]]]). Returns the number actually inserted."""
         before = self.count()
-        self.db.conn.executemany("INSERT OR IGNORE INTO dict_entries(headword,translation,pos,extra,note,source,example) VALUES(?,?,?,?,?,?,?)",
-                                 [(r[0].strip(), r[1].strip(), (r[2] if len(r) > 2 else "") or "", (r[3] if len(r) > 3 else "") or "",
-                                   (r[4] if len(r) > 4 else "") or "", source or self.SOURCE_USER, (r[5] if len(r) > 5 else "") or "")
+        def cell(r, i): return (r[i] if len(r) > i else "") or ""
+        self.db.conn.executemany("INSERT OR IGNORE INTO dict_entries(headword,translation,pos,extra,note,source,example,tr) VALUES(?,?,?,?,?,?,?,?)",
+                                 [(r[0].strip(), r[1].strip(), cell(r, 2), cell(r, 3), cell(r, 4), source or self.SOURCE_USER, cell(r, 5), cell(r, 6).strip())
                                   for r in rows if r and r[0].strip() and r[1].strip()])
         self.db.conn.commit(); return self.count() - before
     def add(self, headword: str, translation: str, pos: str = "", extra: str = "", note: str = "",
-            source: str = SOURCE_USER, example: str = "") -> int:
-        return self.add_many([(headword, translation, pos, extra, note, example)], source)
+            source: str = SOURCE_USER, example: str = "", tr: str = "") -> int:
+        return self.add_many([(headword, translation, pos, extra, note, example, tr)], source)
+    def set_tr(self, headword: str, translation: str, tr: str) -> bool:
+        """Give the stored row (headword, translation) its Turkish gloss; False when no such row exists (built-in entries)."""
+        cur = self.db.execute("UPDATE dict_entries SET tr=? WHERE headword=? AND translation=?", (tr.strip(), headword.strip(), translation.strip()))
+        return cur.rowcount > 0
     def clear(self, source: str | None = None) -> None:
         if source: self.db.execute("DELETE FROM dict_entries WHERE source=?", (source,))
         else: self.db.execute("DELETE FROM dict_entries")

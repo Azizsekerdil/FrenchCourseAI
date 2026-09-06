@@ -9,8 +9,8 @@ French Course AI is an independent Windows desktop learning app built around loc
 - SM-2/Leitner spaced review, daily goal and streak
 - More than 160 built-in A1 words with noun article, gender and plural
 - French-Turkish-English dictionary, favorites and mistake drills
-- Bidirectional **French ↔ English dictionary** tab: 1,210+ built-in entries with gender and irregular plurals, automatic direction, accent/œ/elision-tolerant search, TTS, add-to-word-bank, CSV/TSV import/export
-- **AI-assisted dictionary**: words missing from the dictionary are looked up as structured JSON through LM Studio or an alternative OpenAI-compatible endpoint (NVIDIA NIM or any URL + API key); results (gender/plural, translation, example sentence, note) are cached in the local dictionary and work offline afterwards
+- Trilingual **French ↔ English ↔ Turkish dictionary** tab: 1,210+ built-in entries with gender and irregular plurals, direction selector (`Auto`, `FR → EN`, `EN → FR`, `FR → TR`, `TR → FR`; a fixed direction searches only the source language and the choice is saved), Turkish column and detail line, accent/œ/elision-tolerant search, TTS, add-to-word-bank (the Turkish gloss becomes the word's `tr` field when present), CSV/TSV import/export (`tr` column; header row recognised, old layout accepted)
+- **AI-assisted dictionary**: words missing from the dictionary are looked up as structured JSON through LM Studio or an alternative OpenAI-compatible endpoint (NVIDIA NIM or any URL + API key); results (gender/plural, English and Turkish translation, example sentence, note) are cached in the local dictionary and work offline afterwards; when a `FR → TR` search finds an entry without a Turkish gloss the AI is asked in the background and the gloss is added to that same entry (no duplicate)
 - Cards, multiple choice, typing, listening and matching study modes
 - CEFR A1-C1 profiles and a scored exam engine
 - French spelling, accent and sound lab covering all requested diacritics, apostrophe/elision, liaison, silent finals, nasal vowels, key vowel contrasts, rhythm and dictation
@@ -58,7 +58,7 @@ The dictionary tab can use two providers:
 - **LM Studio** (local, no key) — `app.ai`, the address above.
 - **Alternative endpoint** — any OpenAI-compatible API: the default is `https://integrate.api.nvidia.com/v1` (NVIDIA NIM, model `meta/llama-3.1-8b-instruct`), but another base URL such as OpenRouter, Groq or Ollama, a model name and an API key can be entered. Leave the key empty for a server that needs none (e.g. Ollama/LM Studio on another machine on your network): whether a key is required is decided by the server, not guessed from the address. The model name is sent exactly as typed. Enable it on the Settings page and check it with "Test connection"; the dictionary uses the same `GET /v1/models` probe.
 
-The **Dictionary AI provider** policy (Settings page and the dictionary toolbar) is `Auto` (LM Studio if reachable, otherwise the alternative endpoint if enabled and reachable), `LM Studio`, `Alternative` or `Off`. When a search finds nothing locally the AI is asked in the background; the entries it returns are listed with source `AI` and, by default, stored in the `dict_entries` table. "Ask AI" merges AI entries on top of the list even when local results exist.
+The **Dictionary AI provider** policy (Settings page and the dictionary toolbar) is `Auto` (LM Studio if reachable, otherwise the alternative endpoint if enabled and reachable), `LM Studio`, `Alternative` or `Off`. When a search finds nothing locally the AI is asked in the background; the entries it returns are listed with source `AI` and, by default, stored in the `dict_entries` table. "Ask AI" merges AI entries on top of the list even when local results exist. The AI is asked for both `translation_en` and `translation_tr`; when a `FR → TR` search finds an entry without a Turkish gloss the AI is asked automatically and the returned gloss is written into the existing entry (for built-in entries an `ai`-sourced twin row lands in `dict_entries`; no new entry is created). The answer is matched to the existing entry by headword and meaning - a shared English sense - so it still lands when the AI words the English differently (`attic` / `attic; loft`), when a word has several senses (each gets its own gloss) or when the entry was added by hand without a part of speech.
 
 The API key is stored in the Windows Credential Manager (`FrenchCourseAI/alt_api_key`); off Windows, or if the API fails, it falls back to `settings/secrets.json`. The key is never written to `settings.json`. The `FRENCHCOURSEAI_API_KEY` environment variable overrides the stored key.
 
@@ -75,7 +75,7 @@ The API key is stored in the Windows Credential Manager (`FrenchCourseAI/alt_api
 python -m pytest -q
 ```
 
-The suite covers the window and all 18 pages, immediate/persistent language switching, complete i18n catalogs, migrations, 150+ seed words, the 1,210+-entry dictionary engine (two-way lookup, import/export, SQLite user entries), AI dictionary lookup against a local mock OpenAI server (JSON parsing, Bearer header, provider resolution, the dictionary-tab flow), the secret store (file backend), the `dict_entries` schema migration, SRS, study/exam flows, accent-insensitive search, strict accented spelling, Unicode CSV, offline AI behavior, token privacy and pack round-trips. Tests never touch the real network or the Credential Manager.
+The suite covers the window and all 18 pages, immediate/persistent language switching, complete i18n catalogs, migrations, 150+ seed words, the 1,210+-entry dictionary engine (fixed and automatic directions, Turkish field, import/export, SQLite user entries), AI dictionary lookup against a local mock OpenAI server (JSON parsing, Bearer header, provider resolution, the dictionary-tab flow), the secret store (file backend), the `dict_entries` schema migration, SRS, study/exam flows, accent-insensitive search, strict accented spelling, Unicode CSV, offline AI behavior, token privacy and pack round-trips. Tests never touch the real network or the Credential Manager.
 
 ## Structure
 
@@ -88,7 +88,7 @@ fca/                    independent Python package
   content.py            French-specific learning content
   seed_words.py         original A1 starter vocabulary
   dictionary.py         dictionary engine and structured AI lookup
-  dict_data.py          built-in FR-EN dictionary data
+  dict_data.py          built-in FR-EN-TR dictionary data
   ai_client.py          OpenAI-compatible client (LM Studio, NIM, ...) and provider resolution
   secrets.py            API-key store (Credential Manager / file fallback)
 tests/                  automated tests

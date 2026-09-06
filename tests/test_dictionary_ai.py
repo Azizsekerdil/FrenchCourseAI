@@ -168,6 +168,42 @@ def test_reachability_cache_expires_and_can_be_invalidated(mock_ai):
     client.configure(base=mock_ai.base); assert client.reachable() and mock_ai.count("/models") == 4
 
 
+def test_reachability_probe_started_before_invalidate_never_overwrites_the_fresh_cache():
+    """The user changes the LM Studio address / provider while a probe of the old (dead) server is still blocking: that probe's
+    negative verdict must not replace the verdict obtained for the new state, or the dictionary reports the AI unreachable
+    for up to REACH_TTL seconds although the server answers."""
+    import threading
+    client = AIClient("http://127.0.0.1:9")
+    gate, started = threading.Event(), threading.Event()
+    def stale_probe(timeout=0.8): started.set(); gate.wait(5); return False
+    client.available = stale_probe
+    worker = threading.Thread(target=client.reachable); worker.start(); assert started.wait(2)
+    client.configure(base="http://127.0.0.1:10")                      # invalidates: the in-flight probe belongs to the old endpoint
+    client.available = lambda timeout=0.8: True
+    assert client.reachable() is True
+    gate.set(); worker.join(2)
+    assert client.reachable() is True and client._reach[1] is True     # the stale False did not land
+    # a probe that outlives a plain invalidate() is discarded too, and the next call probes afresh
+    client.invalidate(); gate.clear(); started.clear(); client.available = stale_probe
+    worker = threading.Thread(target=client.reachable); worker.start(); assert started.wait(2)
+    client.invalidate(); gate.set(); worker.join(2)
+    assert client._reach is None
+    client.available = lambda timeout=0.8: True
+    assert client.reachable() is True
+
+
+def test_concurrent_reachability_callers_share_one_probe(mock_ai):
+    """refresh_ai_state() and _run_ai() resolve the provider at the same time: the second caller waits for the first probe
+    instead of racing it, so the server sees one GET /v1/models and both get the same verdict."""
+    import threading
+    client = AIClient(mock_ai.base)
+    results = []
+    threads = [threading.Thread(target=lambda: results.append(client.reachable())) for _ in range(6)]
+    for t in threads: t.start()
+    for t in threads: t.join(5)
+    assert results == [True] * 6 and mock_ai.count("/models") == 1
+
+
 def test_token_logger_and_alt_model_are_used(mock_ai):
     log = []
     AIClient(mock_ai.base, lambda *a: log.append(a)).chat("hi", "chat", "en")

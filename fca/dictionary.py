@@ -1,12 +1,17 @@
-"""Bidirectional target-language <-> English dictionary engine.
+"""Three-language dictionary engine: target language <-> English <-> Turkish.
 
 Layers that are merged at runtime:
 1. Built-in core dictionary (``dict_data.py``; ~900 A1-B1 entries).
 2. User entries imported from CSV/TSV or added by hand (SQLite ``dict_entries``).
 3. AI entries produced by :func:`ai_lookup` and cached into the same table.
 
-Search runs on both sides at once. The best-scoring side decides the direction
-shown to the user; ranking is exact > prefix > word-start > substring.
+Every entry carries the headword (target language), an English translation and an optional
+Turkish gloss (``Entry.tr``). :meth:`Dictionary.lookup` takes a direction code from
+:data:`DIRECTIONS` (``auto`` | ``de2en`` | ``en2de`` | ``de2tr`` | ``tr2de`` for German; the
+English app only has ``auto`` | ``en2tr`` | ``tr2en`` because its translation side already *is*
+Turkish). A fixed direction searches only its source side; ``auto`` searches every side at once
+and the best-scoring side decides the direction shown to the user. Ranking is
+exact > prefix > word-start > substring.
 """
 from __future__ import annotations
 
@@ -14,7 +19,7 @@ import csv
 import json
 import random
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
@@ -49,6 +54,7 @@ class Entry:
     note: str = ""        # optional gloss / definition / usage hint
     source: str = SOURCE_BUILTIN
     example: str = ""     # optional short example sentence in the target language
+    tr: str = ""          # Turkish gloss (DE/FR apps); senses separated by "; " - "" when not known yet
 
     def pos_label(self, lang: str) -> str:
         return POS_LABELS.get(self.pos, {}).get(lang, self.pos)
@@ -82,24 +88,83 @@ GENDERS = {"m", "f", "n", "pl", "mf"}
 
 
 # ---------------------------------------------------------------------------
+# Directions
+# ---------------------------------------------------------------------------
+OTHER_LANG = "tr" if C.TARGET_LANG == "en" else "en"     # language of ``Entry.translation``
+HAS_TR = C.TARGET_LANG != "en"                            # a separate Turkish field exists (DE/FR apps)
+DIRECTIONS: tuple[str, ...] = C.DICT_DIRECTIONS           # ("auto", "de2en", "en2de", "de2tr", "tr2de")
+DEFAULT_DIRECTION = DIRECTIONS[1]                         # what an empty/undecidable "auto" query reports
+# Entry field holding each language; for the English app "tr" is the translation column itself.
+_FIELD_OF_LANG: dict[str, str] = {"tr": "tr"}
+_FIELD_OF_LANG[OTHER_LANG] = "translation"
+_FIELD_OF_LANG[C.TARGET_LANG] = "headword"
+_LANG_OF_FIELD = {field: lang for lang, field in _FIELD_OF_LANG.items()}
+_SIDES = tuple(f for f in ("headword", "translation", "tr") if f in _LANG_OF_FIELD)   # tie order in auto mode
+# Optional script rules for auto mode: a query matching the pattern is only ever searched on that side
+# (the Russian port appends a Cyrillic pattern mapped to "headword": Cyrillic input is always ru2*).
+AUTO_SIDE_RULES: list[tuple[re.Pattern, str]] = []
+
+
+def split_direction(direction: str) -> tuple[str, str]:
+    """``"de2tr"`` -> ``("de", "tr")``; ``"auto"`` (or an unknown code) -> the default pair."""
+    if direction not in DIRECTIONS or direction == "auto":
+        direction = DEFAULT_DIRECTION
+    src, dst = direction.split("2", 1)
+    return src, dst
+
+
+def direction_code(src_lang: str, dst_lang: str) -> str:
+    return f"{src_lang}2{dst_lang}"
+
+
+def source_field(direction: str) -> str:
+    """Entry field that is searched for a fixed direction (``en2de`` -> ``translation``)."""
+    return _FIELD_OF_LANG[split_direction(direction)[0]]
+
+
+def target_field(direction: str) -> str:
+    """Entry field shown as the "target" column for a direction (``de2tr`` -> ``tr``, ``en2de`` -> ``headword``)."""
+    return _FIELD_OF_LANG[split_direction(direction)[1]]
+
+
+def direction_text(direction: str) -> str:
+    """Short label such as ``DE → TR``; ``""`` for ``auto`` or an unknown code."""
+    if direction == "auto" or direction not in DIRECTIONS:
+        return ""
+    return " → ".join(code.upper() for code in split_direction(direction))
+
+
+def _auto_direction(side: str) -> str:
+    """Direction reported when ``side`` scored best in auto mode."""
+    if side == "headword":
+        return DEFAULT_DIRECTION
+    return direction_code(_LANG_OF_FIELD[side], C.TARGET_LANG)
+
+
+# ---------------------------------------------------------------------------
 # Parsing
 # ---------------------------------------------------------------------------
+# Optional fields after ``headword|pos extra|translation`` in built-in lines: DE/FR ``|note|turkish``,
+# the English app ``|definition`` (its translation is Turkish already). A Russian port would use ``("tr",)``.
+LINE_TAIL: tuple[str, ...] = ("note", "tr") if HAS_TR else ("note",)
+
+
 def parse_line(line: str, source: str = SOURCE_BUILTIN) -> Entry | None:
-    """``headword|pos extra…|translation[|note]``."""
+    """``headword|pos extra…|translation[|note[|turkish]]`` (see :data:`LINE_TAIL`); the trailing fields are optional."""
     line = (line or "").strip()
     if not line or line.startswith("#"):
         return None
     parts = [p.strip() for p in line.split("|")]
     if len(parts) < 3:
         return None
-    head, tag, tr = parts[0], parts[1], parts[2]
-    note = parts[3] if len(parts) > 3 else ""
+    head, tag, translation = parts[0], parts[1], parts[2]
+    tail = {name: (parts[3 + i] if len(parts) > 3 + i else "") for i, name in enumerate(LINE_TAIL)}
     toks = tag.split()
     pos = toks[0] if toks else ""
     extra = " ".join(toks[1:])
-    if not head or not tr:
+    if not head or not translation:
         return None
-    return Entry(head, pos, extra, tr, note, source)
+    return Entry(head, pos, extra, translation, tail.get("note", ""), source, "", tail.get("tr", ""))
 
 
 def parse_block(text: str, source: str = SOURCE_BUILTIN) -> list[Entry]:
@@ -129,6 +194,32 @@ def _senses(text: str) -> list[str]:
     return [s for s in out if s]
 
 
+_SENSE_PREFIX = re.compile(r"^(to|the|a|an|sich|se|s') ")
+
+
+def sense_keys(text: str) -> set[str]:
+    """Normalised senses of a translation for overlap checks: ``"to fly; to soar"`` -> ``{"to fly", "fly", "to soar", "soar"}``."""
+    keys: set[str] = set()
+    for sense in _senses(text):
+        keys.add(sense)
+        keys.add(_SENSE_PREFIX.sub("", sense))
+    return keys
+
+
+def fold_pos(pos: str) -> str:
+    """Part-of-speech code used for de-duplication: codes stay, names fold (``noun`` -> ``n``), unknown stays ``""``."""
+    pos = (pos or "").strip()
+    if not pos:
+        return ""
+    return pos if pos in POS_LABELS else normalize_pos(pos)
+
+
+def pos_compatible(stored: str, other: str) -> bool:
+    """True when two parts of speech may describe the same entry: equal after folding, or one of them unknown."""
+    a, b = fold_pos(stored), fold_pos(other)
+    return not a or not b or a == b
+
+
 def _score(q: str, field: str, senses: list[str]) -> int:
     if not field:
         return 0
@@ -150,30 +241,83 @@ def _score(q: str, field: str, senses: list[str]) -> int:
 # Dictionary
 # ---------------------------------------------------------------------------
 class Dictionary:
-    """In-memory two-sided dictionary with de-duplication by (headword, pos, translation)."""
+    """In-memory three-sided dictionary with de-duplication by (headword, pos, translation).
+
+    The part of speech is folded (``noun`` == ``n``) and an unknown one (``""``, as the Add-entry dialog and CSV
+    rows leave it) matches any: the key then agrees with SQLite's ``UNIQUE(headword, translation)``, so an AI
+    answer for a hand-added entry completes that entry instead of living next to it. A duplicate that carries a
+    Turkish gloss the stored entry lacks fills that gloss in (the stored entry keeps its own source): this is how
+    a cached AI row adds Turkish to a built-in entry across restarts."""
 
     def __init__(self, entries: Iterable[Entry] = ()):
         self._entries: list[Entry] = []
-        self._seen: set[tuple[str, str, str]] = set()
+        self._index: dict[tuple[str, str, str], int] = {}
+        self._pairs: dict[tuple[str, str], list[int]] = {}       # (headword, translation) -> entries, any part of speech
         self.extend(entries)
+
+    @staticmethod
+    def _key(e: Entry) -> tuple[str, str, str]:
+        return (_norm(e.headword), fold_pos(e.pos), _norm(e.translation))
+
+    def _twin_index(self, e: Entry) -> int | None:
+        head, pos, translation = self._key(e)
+        at = self._index.get((head, pos, translation))
+        if at is not None:
+            return at
+        for i in self._pairs.get((head, translation), ()):
+            if not pos or not fold_pos(self._entries[i].pos):        # an unknown part of speech on either side matches
+                return i
+        return None
 
     def extend(self, entries: Iterable[Entry]) -> int:
         added = 0
         for e in entries:
-            key = (_norm(e.headword), e.pos, _norm(e.translation))
-            if key in self._seen:
+            at = self._twin_index(e)
+            if at is not None:
+                if e.tr and not self._entries[at].tr:
+                    self._entries[at] = replace(self._entries[at], tr=e.tr)
                 continue
-            self._seen.add(key)
+            head, pos, translation = self._key(e)
+            self._index[(head, pos, translation)] = len(self._entries)
+            self._pairs.setdefault((head, translation), []).append(len(self._entries))
             self._entries.append(e)
             added += 1
         return added
 
+    def twin(self, entry: Entry) -> Entry | None:
+        """The stored entry with the same (headword, pos, translation) key (see the class note on ``pos``), any source; None when unknown."""
+        at = self._twin_index(entry)
+        return None if at is None else self._entries[at]
+
+    def would_change(self, entry: Entry) -> bool:
+        """True when storing ``entry`` changes the dictionary: unknown key, or a known twin lacking the Turkish gloss it carries."""
+        twin = self.twin(entry)
+        return twin is None or bool(entry.tr and not twin.tr)
+
+    def set_tr(self, entry: Entry, tr: str) -> Entry | None:
+        """Give the stored twin of ``entry`` the Turkish gloss ``tr``; returns the updated entry (None when unknown)."""
+        at = self._twin_index(entry)
+        if at is None:
+            return None
+        self._entries[at] = replace(self._entries[at], tr=tr.strip())
+        return self._entries[at]
+
+    def find(self, headword: str, pos: str | None = None) -> list[Entry]:
+        """Every stored entry with this headword (and part of speech, when given - folded, so ``noun`` finds ``n``), any source."""
+        key = _norm(headword)
+        code = None if pos is None else fold_pos(pos)
+        return [e for e in self._entries if _norm(e.headword) == key and (code is None or fold_pos(e.pos) == code)]
+
     def contains(self, entry: Entry) -> bool:
-        return (_norm(entry.headword), entry.pos, _norm(entry.translation)) in self._seen
+        return self._twin_index(entry) is not None
+
+    def has_headword(self, headword: str, pos: str | None = None) -> bool:
+        """True when an entry of any source already carries this headword (and part of speech, when given)."""
+        return bool(self.find(headword, pos))
 
     def remove_source(self, source: str) -> None:
         keep = [e for e in self._entries if e.source != source]
-        self._entries, self._seen = [], set()
+        self._entries, self._index, self._pairs = [], {}, {}
         self.extend(keep)
 
     def __len__(self) -> int:
@@ -189,29 +333,52 @@ class Dictionary:
             out[e.source] = out.get(e.source, 0) + 1
         return out
 
-    def lookup(self, query: str, limit: int = 200) -> tuple[str, list[Entry]]:
-        """Return (direction, entries). direction is 'target' or 'translation'."""
+    def lookup(self, query: str, direction: str = "auto", limit: int = 200) -> tuple[str, list[Entry]]:
+        """Return ``(direction, entries)``.
+
+        ``direction`` is a code from :data:`DIRECTIONS`. A fixed code searches only its source side (headword for
+        ``de2*``, English senses for ``en2*``, Turkish senses for ``tr2*``) and is returned unchanged. ``auto``
+        searches every side and returns the code of the best-scoring side (ties: headword > English > Turkish),
+        so a Turkish query comes back as ``tr2de`` and an English one as ``en2de``."""
+        if isinstance(direction, int):                       # pre-direction callers: lookup(query, limit)
+            direction, limit = "auto", direction
+        if direction not in DIRECTIONS:
+            direction = "auto"
         q = _norm(query)
         if not q:
-            return "target", []
+            return (DEFAULT_DIRECTION if direction == "auto" else direction), []
         q = re.sub(r"^(l|d|j|s|qu|n|m|t|c)' ?", "", q) or q      # l'école -> école
+        if direction == "auto":
+            forced = next((side for pattern, side in AUTO_SIDE_RULES if pattern.search(query or "")), None)
+            sides = (forced,) if forced else _SIDES
+        else:
+            sides = (source_field(direction),)
         scored: list[tuple[int, int, int, Entry]] = []
-        best_side = {"target": 0, "translation": 0}
+        best = {side: 0 for side in _SIDES}
         for e in self._entries:
-            head = _norm(e.headword)
-            target_forms = [head] + [_norm(t) for t in e.headword.split(",") if t.strip()]
-            if e.plural:
-                target_forms.append(_norm(e.plural))
-            s_t = _score(q, head, target_forms)
-            s_x = _score(q, _norm(e.translation), _senses(e.translation))
-            if not s_t and not s_x and e.note and len(q) >= 3:
-                s_x = 8 if _score(q, _norm(e.note), []) >= 30 else 0
-            if s_t or s_x:
-                side = 0 if s_t >= s_x else 1
-                best_side["target" if side == 0 else "translation"] = max(
-                    best_side["target" if side == 0 else "translation"], max(s_t, s_x))
-                scored.append((max(s_t, s_x), side, len(e.headword), e))
-        direction = "target" if best_side["target"] >= best_side["translation"] else "translation"
+            scores: dict[str, int] = {}
+            if "headword" in sides:
+                head = _norm(e.headword)
+                forms = [head] + [_norm(t) for t in e.headword.split(",") if t.strip()]
+                if e.plural:
+                    forms.append(_norm(e.plural))
+                scores["headword"] = _score(q, head, forms)
+            if "translation" in sides:
+                s = _score(q, _norm(e.translation), _senses(e.translation))
+                if not s and not scores.get("headword") and e.note and len(q) >= 3:
+                    s = 8 if _score(q, _norm(e.note), []) >= 30 else 0      # definition / usage note as a last resort
+                scores["translation"] = s
+            if "tr" in sides and e.tr:
+                scores["tr"] = _score(q, _norm(e.tr), _senses(e.tr))
+            top = max(scores.values(), default=0)
+            if not top:
+                continue
+            side = next(f for f in _SIDES if scores.get(f) == top)
+            best[side] = max(best[side], top)
+            scored.append((top, _SIDES.index(side), len(e.headword), e))
+        if direction == "auto":
+            winner = max(_SIDES, key=lambda f: (best[f], -_SIDES.index(f)))
+            direction = _auto_direction(winner)
         scored.sort(key=lambda t: (-t[0], t[1], t[2], t[3].headword.lower()))
         return direction, [e for _s, _side, _l, e in scored[:limit]]
 
@@ -223,25 +390,52 @@ class Dictionary:
 # ---------------------------------------------------------------------------
 # Files
 # ---------------------------------------------------------------------------
+# CSV layout. The Turkish column comes last so that files written before it existed (and header-less files in
+# the old layout) still read positionally; a header row may also put the columns in any order.
+CSV_COLUMNS: tuple[str, ...] = ("headword", "translation", "pos", "extra", "note", "source", "example") + (("tr",) if HAS_TR else ())
+_HEADER_ALIASES: dict[str, str] = {
+    "headword": "headword", "word": "headword", "target": "headword", C.TARGET_LANG: "headword", C.TARGET_LANG_NAME.lower(): "headword",
+    "translation": "translation", "meaning": "translation", OTHER_LANG: "translation",
+    {"en": "english", "tr": "turkish"}[OTHER_LANG]: "translation",
+    "pos": "pos", "extra": "extra", "note": "note", "definition": "note", "source": "source", "example": "example",
+}
+if HAS_TR:
+    _HEADER_ALIASES.update({"tr": "tr", "turkish": "tr", "türkçe": "tr", "turkce": "tr"})
+else:
+    _HEADER_ALIASES.update({"türkçe": "translation", "turkce": "translation"})
+
+
+def _header_columns(row: list[str]) -> dict[str, int] | None:
+    """Column index per field when ``row`` is a header row (headword + translation recognised), else None."""
+    columns: dict[str, int] = {}
+    for i, cell in enumerate(row):
+        field = _HEADER_ALIASES.get(cell.strip().lower())
+        if field and field not in columns:
+            columns[field] = i
+    return columns if {"headword", "translation"} <= set(columns) else None
+
+
 def read_table(path: Path) -> list[Entry]:
-    """CSV/TSV with columns ``headword, translation[, pos[, extra[, note]]]``; header optional."""
+    """CSV/TSV import. With a header row the columns may come in any order (``headword, translation, tr, pos, …``);
+    without one the layout is :data:`CSV_COLUMNS` (``headword, translation[, pos[, extra[, note[, source[, example[, tr]]]]]]``)."""
     path = Path(path)
     raw = path.read_text(encoding="utf-8-sig", errors="replace")
     delim = "\t" if path.suffix.lower() in (".tsv", ".txt") or raw.count("\t") > raw.count(",") else ","
+    columns = {name: i for i, name in enumerate(CSV_COLUMNS)}
     out: list[Entry] = []
     for i, row in enumerate(csv.reader(raw.splitlines(), delimiter=delim)):
-        if len(row) < 2:
+        if i == 0:
+            header = _header_columns(row)
+            if header:
+                columns = header
+                continue
+        def cell(name: str) -> str:
+            at = columns.get(name)
+            return row[at].strip() if at is not None and len(row) > at else ""
+        head, translation = cell("headword"), cell("translation")
+        if not head or not translation:
             continue
-        head, tr = row[0].strip(), row[1].strip()
-        if not head or not tr:
-            continue
-        if i == 0 and head.lower() in ("headword", "word", C.TARGET_LANG, "target") and tr.lower() in ("translation", "en", "tr", "meaning", "english", "turkish"):
-            continue
-        pos = row[2].strip() if len(row) > 2 else ""
-        extra = row[3].strip() if len(row) > 3 else ""
-        note = row[4].strip() if len(row) > 4 else ""
-        example = row[6].strip() if len(row) > 6 else ""
-        out.append(Entry(head, pos, extra, tr, note, SOURCE_USER, example))
+        out.append(Entry(head, cell("pos"), cell("extra"), translation, cell("note"), SOURCE_USER, cell("example"), cell("tr")))
     return out
 
 
@@ -249,9 +443,9 @@ def write_table(path: Path, entries: Iterable[Entry]) -> int:
     n = 0
     with open(path, "w", encoding="utf-8", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["headword", "translation", "pos", "extra", "note", "source", "example"])
+        w.writerow(CSV_COLUMNS)
         for e in entries:
-            w.writerow([e.headword, e.translation, e.pos, e.extra, e.note, e.source, e.example])
+            w.writerow([getattr(e, name) for name in CSV_COLUMNS])
             n += 1
     return n
 
@@ -262,11 +456,11 @@ def builtin_entries() -> list[Entry]:
 
 
 def build_dictionary(user_rows: Iterable[Sequence[Any]] = ()) -> Dictionary:
-    """``user_rows``: ``(headword, translation[, pos[, extra[, note[, source[, example]]]]])`` as stored in SQLite."""
+    """``user_rows``: ``(headword, translation[, pos[, extra[, note[, source[, example[, tr]]]]]])`` as stored in SQLite."""
     d = Dictionary(builtin_entries())
     def cell(r, i): return str((r[i] if len(r) > i else "") or "")
     d.extend(Entry(str(r[0]), cell(r, 2), cell(r, 3), str(r[1]), cell(r, 4),
-                   cell(r, 5) if cell(r, 5) in (SOURCE_USER, SOURCE_AI) else SOURCE_USER, cell(r, 6)) for r in user_rows)
+                   cell(r, 5) if cell(r, 5) in (SOURCE_USER, SOURCE_AI) else SOURCE_USER, cell(r, 6), cell(r, 7)) for r in user_rows)
     return d
 
 
@@ -275,7 +469,7 @@ def build_dictionary(user_rows: Iterable[Sequence[Any]] = ()) -> Dictionary:
 # ---------------------------------------------------------------------------
 AI_MAX_ENTRIES = 5
 AI_MAX_TOKENS = 1200
-_AI_LIMITS = {"headword": 80, "pos": 12, "extra": 80, "translation": 200, "example": 240, "note": 240}
+_AI_LIMITS = {"headword": 80, "pos": 12, "extra": 80, "translation": 200, "tr": 200, "example": 240, "note": 240}
 _OTHER_LANG_NAME = {"de": "English", "fr": "English", "en": "Turkish", "ru": "English"}
 
 _CONVENTIONS = {
@@ -305,26 +499,40 @@ _FENCE = re.compile(r"^\s*```[\w-]*\s*|\s*```\s*$", re.MULTILINE)
 
 
 def ai_prompt(query: str, ui_lang: str = "en") -> str:
-    """Strict instruction: answer ONLY with a JSON array of dictionary entries."""
+    """Strict instruction: answer ONLY with a JSON array of dictionary entries.
+
+    DE/FR apps ask for both ``translation_en`` and ``translation_tr``; the English app keeps the single
+    ``translation`` key (Turkish). :func:`parse_ai_entries` accepts every variant."""
     target, other = C.TARGET_LANG_NAME, _OTHER_LANG_NAME.get(C.TARGET_LANG, "English")
     codes = " ".join(POS_LABELS)
+    if HAS_TR:
+        languages = f"{target}, {other} or Turkish"
+        engine = f"trilingual {target} <-> {other} <-> Turkish"
+        translation_keys = (f'  "translation_en": the English side; several senses separated by "; ",\n'
+                            f'  "translation_tr": the Turkish side (Türkçe); several senses separated by "; ",\n')
+        shape = '"translation_en": "...", "translation_tr": "..."'
+    else:
+        languages = f"{target} or {other}"
+        engine = f"bilingual {target} <-> {other}"
+        translation_keys = f'  "translation": the {other} side; several senses separated by "; ",\n'
+        shape = '"translation": "..."'
     return (
-        f"You are a bilingual {target} <-> {other} dictionary engine.\n"
+        f"You are a {engine} dictionary engine.\n"
         f'Look up: "{query}"\n'
-        f"The query may be in {target} or in {other}. Detect the direction yourself. "
-        f"Every returned entry must have its headword in {target}; if the query is in {other}, return the best {target} "
+        f"The query may be in {languages}. Detect the direction yourself. "
+        f"Every returned entry must have its headword in {target}; if the query is not in {target}, return the best {target} "
         f"equivalents. If the query is misspelled, return the most likely intended {target} word.\n"
         f"Answer ONLY with a JSON array of 1 to {AI_MAX_ENTRIES} objects and nothing else - no prose, no markdown, no code fence.\n"
         "Each object has exactly these keys:\n"
         f'  "headword": the {target} word or phrase (lemma / dictionary form),\n'
         f'  "pos": one of: {codes},\n'
         '  "extra": see the convention below,\n'
-        f'  "translation": the {other} side; several senses separated by "; ",\n'
+        f"{translation_keys}"
         f'  "example": one short natural example sentence in {target} using the headword,\n'
         f'  "note": a short usage note ({other}), or "".\n'
         f"Convention: {_CONVENTIONS.get(C.TARGET_LANG, '')}\n"
-        f'Example of the required shape: [{{"headword": "...", "pos": "n", "extra": "...", "translation": "...", "example": "...", "note": "..."}}]\n'
-        f"Return [] only if the query is not a real word or phrase in either language."
+        f'Example of the required shape: [{{"headword": "...", "pos": "n", "extra": "...", {shape}, "example": "...", "note": "..."}}]\n'
+        f"Return [] only if the query is not a real word or phrase in any of these languages."
     )
 
 
@@ -416,7 +624,11 @@ def parse_ai_entries(text: str) -> list[Entry]:
         if not isinstance(item, dict):
             continue
         head = _clean(item.get("headword"), _AI_LIMITS["headword"])
-        translation = _dedupe_senses(_clean(item.get("translation"), _AI_LIMITS["translation"]))
+        # "translation_en" is the current key; "translation" the legacy one (English for DE/FR, Turkish for the English app).
+        translation = _dedupe_senses(_clean(item.get("translation_en") or item.get("translation"), _AI_LIMITS["translation"]))
+        if not HAS_TR and not translation:
+            translation = _dedupe_senses(_clean(item.get("translation_tr"), _AI_LIMITS["translation"]))
+        tr = _dedupe_senses(_clean(item.get("translation_tr"), _AI_LIMITS["tr"])) if HAS_TR else ""
         if not head or not translation:
             continue
         pos = normalize_pos(item.get("pos"))
@@ -427,7 +639,7 @@ def parse_ai_entries(text: str) -> list[Entry]:
         example = _clean(item.get("example"), _AI_LIMITS["example"])
         note = _clean(item.get("note"), _AI_LIMITS["note"])
         if head:
-            out.append(Entry(head, pos, extra, translation, note, SOURCE_AI, example))
+            out.append(Entry(head, pos, extra, translation, note, SOURCE_AI, example, tr))
         if len(out) >= AI_MAX_ENTRIES:
             break
     return out

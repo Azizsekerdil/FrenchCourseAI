@@ -4,6 +4,7 @@ import base64
 import ipaddress
 import json
 import re
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -86,6 +87,9 @@ class AIClient:
         self.last_finish_reason = ""
         self.last_reasoning_tokens = 0
         self._reach: tuple[float, bool] | None = None
+        self._reach_gen = 0                          # bumped by invalidate(): a probe from an older generation may not write the cache
+        self._state_lock = threading.Lock()          # guards _reach / _reach_gen (never held while probing)
+        self._probe_lock = threading.Lock()          # one probe at a time: concurrent callers wait for it and read its result
         self.configure(base or C.LMSTUDIO_BASE, api_key, model)
 
     # ------------------------------------------------------------------ setup
@@ -100,7 +104,10 @@ class AIClient:
         self.invalidate()
 
     def invalidate(self) -> None:
-        self._reach = None
+        """Forget the cached reachability. A probe already in flight belongs to the old endpoint/state and is discarded."""
+        with self._state_lock:
+            self._reach_gen += 1
+            self._reach = None
 
     @property
     def is_local(self) -> bool:
@@ -148,14 +155,32 @@ class AIClient:
         except Exception:
             return []
 
+    def _cached_reach(self, ttl: float) -> bool | None:
+        with self._state_lock:
+            if self._reach and time.monotonic() - self._reach[0] < ttl:
+                return self._reach[1]
+        return None
+
     def reachable(self, ttl: float = REACH_TTL, timeout: float | None = None) -> bool:
-        """``GET /v1/models`` succeeds; the answer is cached for ``ttl`` seconds."""
-        now = time.monotonic()
-        if self._reach and now - self._reach[0] < ttl:
-            return self._reach[1]
-        ok = self.available(timeout if timeout is not None else (1.5 if self.is_local else 4.0))
-        self._reach = (now, ok)
-        return ok
+        """``GET /v1/models`` succeeds; the answer is cached for ``ttl`` seconds.
+
+        Thread-safe: callers arriving while a probe runs wait for it and share its verdict instead of probing
+        again, and a probe that started before :meth:`configure`/:meth:`invalidate` (the user changed the address
+        or the provider meanwhile) never overwrites the fresh cache with its stale result."""
+        cached = self._cached_reach(ttl)
+        if cached is not None:
+            return cached
+        with self._probe_lock:
+            cached = self._cached_reach(ttl)
+            if cached is not None:
+                return cached
+            with self._state_lock:
+                gen, base = self._reach_gen, self.base
+            ok = self.available(timeout if timeout is not None else (1.5 if self.is_local else 4.0))
+            with self._state_lock:
+                if gen == self._reach_gen and base == self.base:
+                    self._reach = (time.monotonic(), ok)
+            return ok
 
     def choose_model(self, task: str, configured: str = "") -> str:
         configured = configured or self.model
