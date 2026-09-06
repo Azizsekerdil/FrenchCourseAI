@@ -46,6 +46,7 @@ fi
   --osx-bundle-identifier "com.frenchcourseai.desktop" \
   "${ICON_ARGS[@]}" "${SIGN_ARGS[@]}" "${DATA_ARGS[@]}" \
   --hidden-import pypdf \
+  --hidden-import fca.secrets --hidden-import fca.dictionary --hidden-import fca.dict_data --hidden-import fca.tabs.dictionary \
   French_Course_AI.pyw
 
 APP_PATH="dist/FrenchCourseAI.app"

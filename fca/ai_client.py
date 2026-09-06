@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 import base64
+import ipaddress
 import json
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 from . import config as C
 from .i18n import SYSTEM_PROMPTS
+
+REACH_TTL = 30.0            # seconds a reachability probe stays valid
+_LOCAL_HOSTNAMES = {"localhost", "host.docker.internal"}     # loopback by name; IP literals are classified with ``ipaddress``
 
 
 class AIError(RuntimeError):
@@ -17,30 +22,101 @@ class AIError(RuntimeError):
 
 
 class AIClient:
-    """Small OpenAI-compatible client for LM Studio; it never persists message text."""
-    def __init__(self, base: str | None = None, token_logger: Callable | None = None):
-        self.base = (base or C.LMSTUDIO_BASE).rstrip("/")
-        self.token_logger = token_logger
+    """Small OpenAI-compatible client (LM Studio, NVIDIA NIM, OpenRouter, Ollama, ...).
 
+    It never persists message text. ``api_key`` is sent as ``Authorization: Bearer``
+    on every request when set; local servers simply ignore it. Whether an endpoint
+    *needs* a key is never guessed from its host: the server decides (a 401/403 makes
+    it unreachable), so a key-less Ollama/LM Studio on another LAN machine works too.
+
+    ``trust_model``: send the configured model name exactly as typed instead of
+    matching it against ``GET /v1/models`` first (the alternative endpoint: cloud
+    catalogues are huge or partial). LM Studio keeps the catalogue check so a model
+    that is not loaded falls back to one that is, wherever the server runs.
+    """
+    def __init__(self, base: str | None = None, token_logger: Callable | None = None,
+                 api_key: str = "", model: str = "", trust_model: bool = False):
+        self.token_logger = token_logger
+        self.trust_model = trust_model
+        self.api_key = ""
+        self.model = ""
+        self.last_model = ""
+        self._reach: tuple[float, bool] | None = None
+        self.configure(base or C.LMSTUDIO_BASE, api_key, model)
+
+    # ------------------------------------------------------------------ setup
+    def configure(self, base: str | None = None, api_key: str | None = None, model: str | None = None) -> None:
+        """Update endpoint/key/model in place and forget the cached reachability."""
+        if base is not None:
+            self.base = (base or C.LMSTUDIO_BASE).strip().rstrip("/")
+        if api_key is not None:
+            self.api_key = (api_key or "").strip()
+        if model is not None:
+            self.model = (model or "").strip()
+        self.invalidate()
+
+    def invalidate(self) -> None:
+        self._reach = None
+
+    @property
+    def is_local(self) -> bool:
+        """Host of ``base`` is loopback/unspecified. Only used to pick a shorter probe timeout - never to decide about keys."""
+        try:
+            host = (urllib.parse.urlsplit(self.base).hostname or "").lower()
+        except ValueError:                       # malformed IPv6 literal
+            return False
+        try:
+            ip = ipaddress.ip_address(host)
+        except ValueError:
+            return host in _LOCAL_HOSTNAMES
+        return ip.is_loopback or ip.is_unspecified
+
+    # --------------------------------------------------------------- requests
     def _url(self, path: str) -> str:
-        return f"{self.base}/v1/{path.lstrip('/')}"
+        base = self.base[:-3] if self.base.endswith("/v1") else self.base
+        return f"{base}/v1/{path.lstrip('/')}"
+
+    def _headers(self, json_body: bool = False) -> dict[str, str]:
+        headers = {"Accept": "application/json", "User-Agent": f"{C.APP_SLUG}/{C.VERSION}"}
+        if json_body:
+            headers["Content-Type"] = "application/json"
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        return headers
+
+    def _open(self, path: str, data: bytes | None = None, timeout: float = 10.0):
+        request = urllib.request.Request(self._url(path), data=data, headers=self._headers(data is not None),
+                                         method="POST" if data is not None else "GET")
+        return urllib.request.urlopen(request, timeout=timeout)
 
     def available(self, timeout: float = 0.8) -> bool:
         try:
-            with urllib.request.urlopen(self._url("models"), timeout=timeout) as response:
+            with self._open("models", timeout=timeout) as response:
                 return response.status == 200
         except Exception:
             return False
 
     def models(self, timeout: float = 1.5) -> list[str]:
         try:
-            with urllib.request.urlopen(self._url("models"), timeout=timeout) as response:
+            with self._open("models", timeout=timeout) as response:
                 payload = json.loads(response.read().decode("utf-8"))
             return [item["id"] for item in payload.get("data", []) if item.get("id")]
         except Exception:
             return []
 
+    def reachable(self, ttl: float = REACH_TTL, timeout: float | None = None) -> bool:
+        """``GET /v1/models`` succeeds; the answer is cached for ``ttl`` seconds."""
+        now = time.monotonic()
+        if self._reach and now - self._reach[0] < ttl:
+            return self._reach[1]
+        ok = self.available(timeout if timeout is not None else (1.5 if self.is_local else 4.0))
+        self._reach = (now, ok)
+        return ok
+
     def choose_model(self, task: str, configured: str = "") -> str:
+        configured = configured or self.model
+        if configured and self.trust_model:        # alternative endpoint: the typed model name wins, no catalogue probe
+            return configured
         installed = self.models()
         if configured and (not installed or configured in installed):
             return configured
@@ -50,8 +126,10 @@ class AIClient:
         return installed[0] if installed else (configured or C.MODEL_PROFILES["chat"][0])
 
     def chat(self, prompt: str, task: str, ui_lang: str, model: str = "",
-             image_path: str = "", timeout: float = 90.0) -> str:
+             image_path: str = "", timeout: float = 90.0, system: str = "",
+             temperature: float = 0.35, max_tokens: int = 900) -> str:
         chosen = self.choose_model(task, model)
+        self.last_model = chosen
         content: str | list[dict] = prompt
         if image_path:
             path = Path(image_path)
@@ -61,29 +139,62 @@ class AIClient:
                        {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{encoded}"}}]
         body = json.dumps({
             "model": chosen,
-            "messages": [{"role": "system", "content": SYSTEM_PROMPTS[ui_lang]},
+            "messages": [{"role": "system", "content": system or SYSTEM_PROMPTS.get(ui_lang, SYSTEM_PROMPTS["en"])},
                          {"role": "user", "content": content}],
-            "temperature": 0.35,
-            "max_tokens": 900,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
         }, ensure_ascii=False).encode("utf-8")
-        request = urllib.request.Request(self._url("chat/completions"), data=body,
-                                         headers={"Content-Type": "application/json"}, method="POST")
         started = time.perf_counter()
         ok = False
-        usage = {}
+        usage: dict[str, Any] = {}
         try:
-            with urllib.request.urlopen(request, timeout=timeout) as response:
+            with self._open("chat/completions", data=body, timeout=timeout) as response:
                 payload = json.loads(response.read().decode("utf-8"))
             usage = payload.get("usage") or {}
             ok = True
             return payload["choices"][0]["message"]["content"].strip()
-        except (OSError, KeyError, IndexError, ValueError, urllib.error.URLError) as exc:
+        except (OSError, KeyError, IndexError, TypeError, ValueError, urllib.error.URLError) as exc:
             raise AIError(str(exc)) from exc
         finally:
             if self.token_logger:
                 elapsed = int((time.perf_counter() - started) * 1000)
-                self.token_logger(chosen, task, int(usage.get("prompt_tokens", 0)),
-                                  int(usage.get("completion_tokens", 0)), elapsed, ok)
+                self.token_logger(chosen, task, int(usage.get("prompt_tokens", 0) or 0),
+                                  int(usage.get("completion_tokens", 0) or 0), elapsed, ok)
+
+
+def resolve_provider(settings: dict, local: AIClient | None, alt: AIClient | None,
+                     policy: str | None = None) -> AIClient | None:
+    """Client the dictionary should use under ``settings["dict_ai"]`` (or ``policy``).
+
+    off   -> None
+    local -> local client when local AI is enabled and reachable
+    alt   -> alternative client when enabled and reachable
+    auto  -> local if reachable, else alternative if enabled and reachable, else None
+
+    "Reachable" is ``GET /v1/models`` with the client's own key succeeding (cached
+    ``REACH_TTL`` seconds) - the same probe as the Settings "Test connection" button,
+    so both give the same verdict: a missing key is refused by the server, a key-less
+    server on another machine is accepted.
+    """
+    policy = policy or settings.get("dict_ai") or "auto"
+    if policy not in C.DICT_AI_POLICIES:
+        policy = "auto"
+
+    def local_ok() -> bool:
+        return bool(settings.get("ai_enabled", True)) and local is not None and local.reachable()
+
+    def alt_ok() -> bool:
+        return bool(settings.get("alt_enabled")) and alt is not None and alt.reachable()
+
+    if policy == "off":
+        return None
+    if policy == "local":
+        return local if local_ok() else None
+    if policy == "alt":
+        return alt if alt_ok() else None
+    if local_ok():
+        return local
+    return alt if alt_ok() else None
 
 
 def approx_tokens(text: str) -> int:

@@ -5,7 +5,7 @@ root = Path(SPEC).resolve().parent
 a = Analysis(
     [str(root / "French_Course_AI.pyw")], pathex=[str(root)], binaries=[],
     datas=[(str(root / "assets"), "assets"), (str(root / "Resources"), "Resources"), (str(root / "grammar"), "grammar")],
-    hiddenimports=["pypdf"], hookspath=[], hooksconfig={}, runtime_hooks=[], excludes=[], noarchive=False,
+    hiddenimports=["pypdf", "fca.secrets", "fca.dictionary", "fca.dict_data", "fca.tabs.dictionary"], hookspath=[], hooksconfig={}, runtime_hooks=[], excludes=[], noarchive=False,
 )
 pyz = PYZ(a.pure)
 exe = EXE(

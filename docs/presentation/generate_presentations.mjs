@@ -290,10 +290,10 @@ const configs = [
     metricTabsLabel: "öğrenme alanı\nlearning areas\nespaces d’apprentissage",
     deliveryLine: "EXE + source + docs + private GitHub + trilingual deck · EXE + kaynak + belgeler + GitHub privé + sunum trilingue",
     platformCaption: "Windows x64 · macOS arm64",
-    platformLineTr: "Windows 10/11 (x64) + macOS (Apple Silicon) — İndirme: github.com/Azizsekerdil/FrenchCourseAI/releases (v1.0.0) · (özel repo)",
-    platformLineEn: "Windows 10/11 (x64) & macOS (Apple Silicon) — Download: GitHub Releases (v1.0.0)",
+    platformLineTr: "Windows 10/11 (x64) + macOS (Apple Silicon) — İndirme: github.com/Azizsekerdil/FrenchCourseAI/releases (v1.1.0) · (özel repo)",
+    platformLineEn: "Windows 10/11 (x64) & macOS (Apple Silicon) — Download: GitHub Releases (v1.1.0)",
     macNote: "macOS paketi Apple Silicon (arm64) içindir ve notarize edilmemiştir; ilk açılışta sağ tık → Aç. / Not notarized; first launch: right-click → Open.",
-    releaseUrl: "https://github.com/Azizsekerdil/FrenchCourseAI/releases/tag/v1.0.0",
+    releaseUrl: "https://github.com/Azizsekerdil/FrenchCourseAI/releases/tag/v1.1.0",
   },
 ];
 

@@ -1,5 +1,6 @@
 import csv
 import json
+import sqlite3
 import zipfile
 from datetime import date, timedelta
 
@@ -8,6 +9,7 @@ import pytest
 from fca import config as C
 from fca.ai_client import AIClient
 from fca.db import Database, Repos, SCHEMA_VERSION
+from fca.dictionary import build_dictionary
 from fca.srs import SRSState
 from fca.transfer import CSV_FIELDS, export_csv, export_pack, import_csv, import_pack
 
@@ -67,3 +69,33 @@ def test_token_ledger_has_no_prompt_or_response_columns(repos):
 def test_ai_unavailable_is_safe_and_non_throwing():
     client = AIClient("http://127.0.0.1:9")
     assert client.available(timeout=0.05) is False and client.models(timeout=0.05) == []
+
+
+OLD_DICT_SCHEMA = """
+CREATE TABLE dict_entries(
+ id INTEGER PRIMARY KEY, headword TEXT NOT NULL, translation TEXT NOT NULL,
+ pos TEXT NOT NULL DEFAULT '', extra TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '',
+ created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(headword, translation));
+"""
+
+
+def test_dict_entries_gets_source_and_example_columns_on_old_databases(tmp_path):
+    path = tmp_path / "old.db"
+    old = sqlite3.connect(path)
+    old.executescript(OLD_DICT_SCHEMA)
+    old.execute("INSERT INTO dict_entries(headword,translation,pos,extra,note) VALUES('bretzel','pretzel','n','m','')")
+    old.commit(); old.close()
+    db = Database(path); repos = Repos(db)
+    assert {"source", "example"} <= {r[1] for r in db.query("PRAGMA table_info(dict_entries)")}
+    rows = repos.dictionary.all()
+    assert [(r["headword"], r["source"], r["example"]) for r in rows] == [("bretzel", "user", "")]
+    assert repos.dictionary.add("chouquette", "choux bun", "n", "f", "", "ai", "Une chouquette, s'il vous plaît.") == 1
+    assert repos.dictionary.add_many([("bretzel", "pretzel")], "ai") == 0            # UNIQUE(headword, translation) still holds
+    assert repos.dictionary.count_by_source() == {"user": 1, "ai": 1} and repos.dictionary.count("ai") == 1
+    d = build_dictionary([(r["headword"], r["translation"], r["pos"], r["extra"], r["note"], r["source"], r["example"]) for r in repos.dictionary.all()])
+    chouquette, bretzel = d.lookup("chouquette")[1][0], d.lookup("bretzel")[1][0]
+    assert (chouquette.source, chouquette.example, bretzel.source) == ("ai", "Une chouquette, s'il vous plaît.", "user")
+    repos.dictionary.clear("ai")
+    assert repos.dictionary.count() == 1 and repos.dictionary.count_by_source() == {"user": 1}
+    assert Database(path).query("PRAGMA table_info(dict_entries)")                   # reopening is idempotent
+    db.close()
