@@ -1,6 +1,6 @@
 # French Course AI — Kullanım Kılavuzu
 
-Sürüm 1.2.0 · Windows ve macOS masaüstü uygulaması · Arayüz dilleri: Türkçe, English, Français
+Sürüm 1.2.1 · Windows ve macOS masaüstü uygulaması · Arayüz dilleri: Türkçe, English, Français
 
 ## İçindekiler
 
@@ -20,9 +20,9 @@ Sürüm 1.2.0 · Windows ve macOS masaüstü uygulaması · Arayüz dilleri: Tü
 
 ## 1. Bu kılavuz hakkında
 
-French Course AI, Fransızca öğrenenler için bağımsız bir masaüstü uygulamasıdır. Bu kılavuz **sürüm 1.2.0**'i anlatır ve tek başına okunabilir: hiçbir adım için başka bir belgeye ihtiyacınız yoktur.
+French Course AI, Fransızca öğrenenler için bağımsız bir masaüstü uygulamasıdır. Bu kılavuz **sürüm 1.2.1**'i anlatır ve tek başına okunabilir: hiçbir adım için başka bir belgeye ihtiyacınız yoktur.
 
-Kılavuz, ana dili Türkçe olan ve Fransızcada A1-B1 aralığında ilerleyen bir öğrenci için yazıldı. Yeni kurduysanız baştan sona okuyun; günlük kullanımda ilgili bölüme atlayın. [4. Ekranlar](#4-ekranlar) 18 sayfayı kenar çubuğundaki sırayla anlatır; [5. Sözlük](#5-sözlük-ayrıntılı) ve [6. Yapay zeka](#6-yapay-zeka) sürüm 1.2.0'in en çok değişen parçalarıdır.
+Kılavuz, ana dili Türkçe olan ve Fransızcada A1-B1 aralığında ilerleyen bir öğrenci için yazıldı. Yeni kurduysanız baştan sona okuyun; günlük kullanımda ilgili bölüme atlayın. [4. Ekranlar](#4-ekranlar) 18 sayfayı kenar çubuğundaki sırayla anlatır; [5. Sözlük](#5-sözlük-ayrıntılı) ve [6. Yapay zeka](#6-yapay-zeka) sürüm 1.2.1'in en çok değişen parçalarıdır.
 
 Düğme ve alan adları Türkçe arayüzde göründüğü gibi yazılmıştır; yararlı olduğu yerde İngilizcesi parantez içindedir. Temel işlevler internetsiz çalışır; yalnızca Kaynak Merkezi bağlantıları ve isteğe bağlı alternatif yapay zeka uç noktası internet kullanır.
 
@@ -407,6 +407,7 @@ Diğer ipuçları:
 | **v1.1.1** | Sözlük AI düzeltmeleri: düşünen modellerde boş yanıt sorunu, model seçimi |
 | **v1.1.2** | Sözlük AI cilası: isimlerde ek alanı temizliği, AI yanıtında yön etiketi, araç çubuğu düzeni, tekrar eden anlamların ayıklanması |
 | **v1.2.0** | **Yön seçici** (`Otomatik`, `FR → EN`, `EN → FR`, `FR → TR`, `TR → FR`; seçim kaydedilir) ve **üçüncü dil olarak Türkçe**: tabloda ve detay panelinde Türkçe sütunu, `FR → TR` yönünde eksik Türkçe karşılığın AI ile aynı maddeye doldurulması, CSV'de `tr` sütunu, 1.219 gömülü madde |
+| **v1.2.1** | **Türkçe aramada ASCII ve büyük harf desteği**: `sinav` = `SINAV` = `sınav`, `cok` = `çok`, `ogrenci` = `öğrenci`; Türkçe katlama Fransızca aksan sadeleştirmesinden önce uygulanır, katlanarak bulunan eşleşme doğrudan eşleşmenin altına sıralanır, gösterilen yazım değişmez. Ayrıca **kullanım kılavuzu** depoya eklendi (`docs/KULLANIM_KILAVUZU.md` ve `docs/USER_GUIDE.md`; PDF sürümü sürüm ek dosyası olarak yayımlanır) |
 
 ## 11. Sık sorulan sorular
 

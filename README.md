@@ -4,6 +4,8 @@ French Course AI, Fransızca öğrenimi için yerel veriyi önceleyen bağımsı
 
 > Temel çalışma özellikleri ve öğrenci verileri yereldir. Kaynak bağlantılarını açmak ve isteğe bağlı uzak servisleri kullanmak internet gerektirir; uygulama bu nedenle yanıltıcı bir “%100 çevrimdışı” iddiasında bulunmaz.
 
+**Kullanım kılavuzu:** [docs/KULLANIM_KILAVUZU.md](docs/KULLANIM_KILAVUZU.md) (kurulum, 18 ekran, sözlük, yapay zeka, sorun giderme ve SSS).
+
 ## Öne çıkan özellikler
 
 - SM-2 ve Leitner tabanlı aralıklı tekrar; günlük hedef ve seri
