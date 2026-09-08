@@ -1,6 +1,6 @@
 # French Course AI — User Guide
 
-Version 1.2.1 · Windows and macOS desktop app · Interface languages: Türkçe, English, Français
+Version 1.3.0 · Windows and macOS desktop app · Interface languages: Türkçe, English, Français
 
 ## Table of contents
 
@@ -21,7 +21,7 @@ Version 1.2.1 · Windows and macOS desktop app · Interface languages: Türkçe,
 
 ## 1. About this guide
 
-French Course AI is a standalone desktop application for learners of French. This guide describes **version 1.2.1** and can be read on its own: no step needs another document.
+French Course AI is a standalone desktop application for learners of French. This guide describes **version 1.3.0** and can be read on its own: no step needs another document.
 
 It is written for a learner working somewhere between A1 and B1 in French, with Turkish as the third language of the dictionary. If you have just installed the app, read the guide end to end; in daily use, jump to the section you need. [4. Screens](#4-screens) covers all 18 pages in sidebar order; [5. The dictionary](#5-the-dictionary-in-detail) and [6. Artificial intelligence](#6-artificial-intelligence) describe what changed most in version 1.2.1.
 
@@ -409,6 +409,7 @@ Other tips:
 | **v1.1.2** | Dictionary AI polish: cleanup of the noun `extra` field, a direction label on the AI answer, toolbar layout, deduplicated senses |
 | **v1.2.0** | The **direction selector** (`Auto`, `FR → EN`, `EN → FR`, `FR → TR`, `TR → FR`; the choice is saved) and **Turkish as a third language**: a Turkish column in the table and the detail panel, a missing Turkish gloss filled by the AI into the same entry in the `FR → TR` direction, a `tr` column in CSV, 1,219 built-in entries |
 | **v1.2.1** | **ASCII and upper-case support for Turkish search**: `sinav` = `SINAV` = `sınav`, `cok` = `çok`, `ogrenci` = `öğrenci`; Turkish folding runs before the French accent simplification, a match found only through folding ranks below a direct match, and the spelling shown is unchanged. Also the **user guide** was added to the repository (`docs/KULLANIM_KILAVUZU.md` and `docs/USER_GUIDE.md`; the PDF is published as a release asset) |
+| **v1.3.0** | **MIT licence**: the project is published under the MIT License; `LICENSE` and `THIRD_PARTY_NOTICES.md` were added to the repository and now ship both inside and next to the published packages. The packages are also built in a **clean virtual environment**: only the libraries in `requirements.txt` enter the package, the download gets smaller, and the third-party notices travel with it |
 
 ## 11. Frequently asked questions
 
