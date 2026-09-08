@@ -7,16 +7,20 @@ released under.
 
 Every licence below was read from the installed package metadata
 (`License` / `License-Expression`) or from the licence file the component itself
-ships, not from memory. The versions are the ones present in the build
-environment that produced the v1.2.1 packages; `numpy 2.4.6` and
-`cryptography 50.0.0` are additionally confirmed by the `.dist-info` directories
-embedded in `FrenchCourseAI.exe`.
+ships, not from memory. The versions are the ones present in the clean virtual
+environment that produced the v1.3.0 packages. From v1.3.0 both platforms are
+built the same way — in a throwaway virtual environment created outside the
+repository that contains only `requirements.txt` (`pypdf`) plus PyInstaller — so
+nothing beyond `pypdf`, the project's own code and the CPython runtime can reach
+either binary.
 
 Scope of "distributed binaries":
 
 * `FrenchCourseAI.exe` / `FrenchCourseAI-Windows.zip` — one-file PyInstaller build,
   Windows x64, produced by `build.bat` from `FrenchCourseAI.spec`. The zip holds
-  `FrenchCourseAI.exe`, `LICENSE` and this file.
+  `FrenchCourseAI.exe`, `LICENSE` and this file. Its frozen archive holds 55
+  `pypdf` modules, the project's own 24 `fca` modules and the CPython 3.11.9
+  standard library — nothing else.
 * `FrenchCourseAI-macOS.zip` — `FrenchCourseAI.app`, built by
   `build_macos.sh` / `.github/workflows/build-macos.yml`. The zip holds
   `FrenchCourseAI.app`, `LICENSE` and this file.
@@ -25,12 +29,12 @@ Scope of "distributed binaries":
 the notices travel with the application even when the archive is discarded; see
 "How that obligation is actually discharged" at the end of section 4.
 
-> **Applies from this revision onward.** The two licence files were added to
+> **Applies from v1.3.0 onward.** The two licence files were added to
 > `FrenchCourseAI.spec`, `build_macos.sh` and `build.bat` *after* the v1.2.1
-> archives were cut, so the v1.2.1 artefacts already on disk and any copy already
-> published do **not** contain them. Re-cut both archives from this revision before
-> the next release; until then the paragraph above describes what the build scripts
-> produce, not what a v1.2.1 download contains.
+> archives were cut, so the v1.2.1 downloads and every earlier one do **not**
+> contain them. Both archives were re-cut for v1.3.0, which is the first release
+> in which the paragraph above describes what a download actually contains. The
+> older releases are left untouched; section 4 keeps their attribution on record.
 
 ---
 
@@ -40,17 +44,17 @@ the notices travel with the application even when the archive is discarded; see
 
 | Component | Version | Licence | Used for |
 | --- | --- | --- | --- |
-| [pypdf](https://github.com/py-pdf/pypdf) | 6.13.2 (pinned `>=5.0,<7`) | BSD-3-Clause | `PdfReader` in `fca/tabs/reading.py` — extracting page text for the PDF reader page. |
+| [pypdf](https://github.com/py-pdf/pypdf) | 6.18.0 (pinned `>=5.0,<7`) | BSD-3-Clause | `PdfReader` in `fca/tabs/reading.py` — extracting page text for the PDF reader page. |
 
 ## 2. Build and test tooling (not part of the shipped application code)
 
 | Component | Version | Licence | Used for |
 | --- | --- | --- | --- |
 | [pytest](https://github.com/pytest-dev/pytest) | 9.1.1 (pinned `>=8.0,<10`) | MIT | Running the automated test suite. |
-| [PyInstaller](https://github.com/pyinstaller/pyinstaller) | 6.21.0 (pinned `>=6.0,<7`) | GPL-2.0-or-later **with the bootloader exception** | Freezing the app into `FrenchCourseAI.exe` and `FrenchCourseAI.app`. |
-| [pyinstaller-hooks-contrib](https://github.com/pyinstaller/pyinstaller-hooks-contrib) | 2026.6 | Dual: **Apache-2.0** for `_pyinstaller_hooks_contrib/rthooks`, **GPL-2.0-or-later** for every other hook/file | Required PyInstaller dependency (community hooks). Only one Apache-2.0 run-time hook is distributed — see below. |
+| [PyInstaller](https://github.com/pyinstaller/pyinstaller) | 6.22.2 (pinned `>=6.0,<7`) | GPL-2.0-or-later **with the bootloader exception** | Freezing the app into `FrenchCourseAI.exe` and `FrenchCourseAI.app`. |
+| [pyinstaller-hooks-contrib](https://github.com/pyinstaller/pyinstaller-hooks-contrib) | 2026.7 | Dual: **Apache-2.0** for `_pyinstaller_hooks_contrib/rthooks`, **GPL-2.0-or-later** for every other hook/file | Required PyInstaller dependency (community hooks). From v1.3.0 **no file of this package is distributed at all** — see below. |
 | [altgraph](https://github.com/ronaldoussoren/altgraph) | 0.17.5 | MIT | PyInstaller dependency (import graph). |
-| [packaging](https://github.com/pypa/packaging) | 26.2 | Apache-2.0 OR BSD-2-Clause | Required by both PyInstaller and pytest (version/requirement parsing). |
+| [packaging](https://github.com/pypa/packaging) | 26.3 in the build venv, 26.2 in the test environment | Apache-2.0 OR BSD-2-Clause | Required by both PyInstaller and pytest (version/requirement parsing). |
 | [pefile](https://github.com/erocarrera/pefile) | 2024.8.26 | MIT | PyInstaller dependency (Windows PE analysis; `sys_platform == "win32"` only). |
 | [pywin32-ctypes](https://github.com/enthought/pywin32-ctypes) | 0.2.3 | BSD-3-Clause | PyInstaller dependency (Windows API access at build time; Windows only). |
 | [macholib](https://github.com/ronaldoussoren/macholib) | 1.16.4 | MIT | PyInstaller dependency for `sys_platform == "darwin"` — installed by `build_macos.sh` and by the macOS CI job, never on Windows. |
@@ -65,20 +69,19 @@ PyInstaller's own dependencies, reaches either published binary.
 "unlimited permission to link or embed compiled bootloader and related files into
 combinations with other programs, and to distribute those combinations without any
 restriction coming from the use of those files" (COPYING.txt, *Bootloader
-Exception*). Only the bootloader, PyInstaller's own Apache-2.0 run-time hooks, and
-— in the Windows build — one Apache-2.0 run-time hook from PyInstaller Community
-Hooks (`pyi_rth_cryptography_openssl.py`, which carries
-`SPDX-License-Identifier: Apache-2.0`) end up inside the frozen application, so the
-GPL does **not** reach French Course AI, which stays MIT-licensed. Neither
-PyInstaller nor the GPL-2.0-or-later build-time hooks of pyinstaller-hooks-contrib
-are ever redistributed by this project.
+Exception*). Only the bootloader and PyInstaller's own Apache-2.0 run-time hooks
+end up inside the frozen application, so the GPL does **not** reach French Course
+AI, which stays MIT-licensed. Neither PyInstaller nor the GPL-2.0-or-later
+build-time hooks of pyinstaller-hooks-contrib are ever redistributed by this
+project.
 
 The run-time hooks that are actually embedded were read out of the built packages.
-`FrenchCourseAI.exe` carries five: `pyi_rth__tkinter`, `pyi_rth_inspect`,
-`pyi_rth_multiprocessing` and `pyi_rth_pkgutil` from `PyInstaller/hooks/rthooks/`,
-plus `pyi_rth_cryptography_openssl` from `_pyinstaller_hooks_contrib/rthooks/`.
-`FrenchCourseAI.app` carries only `pyi_rth__tkinter` and `pyi_rth_inspect`, both
-PyInstaller's own — no pyinstaller-hooks-contrib code reaches the macOS package.
+As of v1.3.0 `FrenchCourseAI.exe` carries two, `pyi_rth__tkinter` and
+`pyi_rth_inspect`, both from `PyInstaller/hooks/rthooks/`; `FrenchCourseAI.app`
+carries the same two. No pyinstaller-hooks-contrib code reaches either package any
+more. (Up to v1.2.1 the Windows exe additionally carried `pyi_rth_multiprocessing`,
+`pyi_rth_pkgutil` and the community `pyi_rth_cryptography_openssl`, the last of
+which was pulled in by the accidentally bundled `cryptography`.)
 
 ## 3. Embedded in the published binaries, per platform (Python runtime and its libraries)
 
@@ -122,25 +125,39 @@ otherwise, versions are those of the Windows CPython 3.11.9 build.
 
 ### Microsoft Distributable Code (Windows binary only)
 
-`VCRUNTIME140.dll`, `VCRUNTIME140_1.dll`, `ucrtbase.dll` and the
+`VCRUNTIME140.dll`, `ucrtbase.dll` and the
 `api-ms-win-*.dll` forwarders are Microsoft Distributable Code embedded by the
 CPython Windows build and by PyInstaller. They are redistributable under
 Microsoft's own terms; see the "Additional Conditions for this Windows binary
 build" section of the CPython `LICENSE.txt`.
 
-## 4. Additionally embedded in the Windows x64 build of v1.2.1
+## 4. Historical: additionally embedded in the Windows x64 builds up to v1.2.1
 
-`fca/` never imports these packages. They entered `FrenchCourseAI.exe` because
-PyInstaller follows the optional imports inside `pypdf`
+> **None of this section applies to v1.3.0 or later.** From v1.3.0 the Windows
+> package is built the way the macOS package always was — with a throwaway virtual
+> environment created outside the repository that holds only `requirements.txt`
+> (`pypdf`) plus PyInstaller — so `FrenchCourseAI.exe` now contains `pypdf`, the
+> project's own `fca/` package and the CPython runtime, and nothing below. The
+> executable went from 44,071,952 to 16,472,827 bytes.
+
+The section is kept because the v1.0.0 - v1.2.1 Windows archives remain published
+and do contain the components listed here, so their attribution has to stay on
+record.
+
+`fca/` never imported any of them. They entered the older `FrenchCourseAI.exe`
+because PyInstaller follows the optional imports inside `pypdf`
 (`pypdf/_page.py` → `PIL`, `pypdf/_font.py` → `fontTools`,
 `pypdf/_crypt_providers/_cryptography.py` → `cryptography`) and then their own
-optional imports, and because those packages happened to be installed on the
-machine that produced the Windows build. The macOS CI job installs only
-`requirements.txt`, so `FrenchCourseAI.app` contains **none** of them — its
-archive holds `pypdf` and the standard library only.
+optional imports, and because those packages happened to be installed in the
+global interpreter that produced those builds. The macOS CI job has always
+installed only `requirements.txt`, so `FrenchCourseAI.app` never contained any of
+them.
 
-They are listed here because they are genuinely present in the published Windows
-binary.
+Dropping them costs one optional capability, on Windows as on macOS: `pypdf` can
+no longer decrypt AES-encrypted PDFs, because neither `cryptography` nor
+`pycryptodome` is present. Opening such a file in the PDF reader page fails
+without affecting the rest of the application. Every other feature is unchanged;
+nothing in `fca/` imports these packages.
 
 ### BSD-3-Clause
 
@@ -216,9 +233,9 @@ libpng 1.6.56 (PNG Reference Library License v2) and brotli 1.2.0 (MIT). Those
 four are linked into `PIL\_imagingft.cp311-win_amd64.pyd`, which PyInstaller did
 **not** pull into this build — the exe's manifest contains `_imaging`, `_avif`,
 `_webp`, `_imagingcms`, `_imagingmath` and `_imagingtk` and no `_imagingft` — so
-they are not redistributed and no obligation attaches to them here. Excluding
-`PIL` from the PyInstaller build would remove every library in this section;
-nothing in `fca/` needs it.
+they are not redistributed and no obligation attaches to them here. The v1.3.0
+clean-virtualenv build keeps `PIL` out altogether, which removed every library in
+this section; nothing in `fca/` needs it.
 
 None of these libraries is under a copyleft licence. Every one of them carries the
 ordinary "reproduce the copyright notice and licence text with binary
@@ -226,9 +243,10 @@ redistributions" obligation, and unlike numpy's and cryptography's, Pillow's
 aggregated licence file is **not** among the `.dist-info` folders PyInstaller
 happened to copy into the exe. The attribution for the libraries above therefore
 rests entirely on this document, which is why each is named individually and why
-`THIRD_PARTY_NOTICES.md` is now packaged inside and alongside both binaries. Their
-full texts (libaom's excepted, see above) are in
-`pillow-12.2.0.dist-info/licenses/LICENSE` in the build environment.
+`THIRD_PARTY_NOTICES.md` is packaged inside and alongside both binaries from
+v1.3.0 on. Their full texts (libaom's excepted, see above) are in
+`pillow-12.2.0.dist-info/licenses/LICENSE` in the environment that produced the
+older Windows builds.
 
 ### Obligations attached to section 4
 
@@ -238,11 +256,11 @@ full texts (libaom's excepted, see above) are in
   which is GPL-3.0-or-later WITH GCC-exception-3.1**. The GCC Runtime Library
   Exception is an additional permission under section 7 of the GPLv3 that lets
   the compiled result be distributed under any licence, so this does not make
-  the application copyleft — but it is the one GPL-family text inside the
-  Windows binary and it is named here deliberately. The same DLL folder carries
-  a Microsoft `msvcp140-*.dll`. Excluding `numpy` (and the rest of section 4)
-  from the PyInstaller build removes this component entirely; nothing in `fca/`
-  needs it.
+  the application copyleft — but it was the one GPL-family text inside the
+  Windows binary up to v1.2.1 and it is named here deliberately. The same DLL
+  folder carries a Microsoft `msvcp140-*.dll`. The v1.3.0 clean-virtualenv build
+  excludes `numpy` and the rest of section 4, which removes this component
+  entirely; nothing in `fca/` needs it.
 * **cryptography's Rust crates.** `cryptography/hazmat/bindings/_rust.pyd` statically
   links the crates listed in the embedded
   `cryptography-50.0.0.dist-info/sboms/cryptography-rust.cyclonedx.json`. All are
@@ -265,9 +283,9 @@ full texts (libaom's excepted, see above) are in
 * **BSD / MIT / MIT-CMU / PSF / Zlib components** require their copyright notice
   and licence text to be reproduced with binary redistributions — which is what
   this file, together with the licence files embedded in the package, is for.
-* **How that obligation is actually discharged** (from this revision onward — see
-  the note under "Scope of distributed binaries" about the already-cut v1.2.1
-  archives). `LICENSE` (the project's own
+* **How that obligation is actually discharged** (from v1.3.0 onward — see
+  the note under "Scope of distributed binaries" about the already-cut v1.2.1 and
+  earlier archives). `LICENSE` (the project's own
   MIT text) and `THIRD_PARTY_NOTICES.md` (this file) are packaged **inside** both
   binaries and placed **next to** them in both release archives:
   `FrenchCourseAI.spec` adds them to `datas`, `build_macos.sh` adds them via
@@ -277,11 +295,11 @@ full texts (libaom's excepted, see above) are in
   application's other data files — `sys._MEIPASS` for the one-file exe, and
   `FrenchCourseAI.app/Contents/Resources/` for the .app (which is where PyInstaller
   puts `--add-data` targets, symlinked from `Contents/Frameworks/`). Beyond those two files,
-  the packages also carry the licence texts PyInstaller collects on its own:
-  `_tk_data/license.terms`, `cryptography-50.0.0.dist-info/licenses/*` and
-  `numpy-2.4.6.dist-info/licenses/**` in the Windows exe. Pillow's, lxml's and
-  fontTools' licence files are *not* among them, so for those components the
-  attribution rests on this document.
+  the only licence text PyInstaller still collects on its own is
+  `_tk_data/license.terms`; the `cryptography` and `numpy` `.dist-info` licence
+  folders that used to travel in the Windows exe went out with the packages
+  themselves in v1.3.0. For every component in section 3 the attribution
+  therefore rests on this document.
 * **No MPL-2.0 component is present.** (Had one been, its source files would have
   to remain available in their original form under MPL-2.0 §3.) `certifi` is
   installed in the build environment but is *not* pulled into either binary.
@@ -322,4 +340,4 @@ French Course AI.
 
 ---
 
-*Last verified: 2026-09-08, against French Course AI 1.2.1.*
+*Last verified: 2026-09-08, against French Course AI 1.3.0 (clean-virtualenv Windows build, `FrenchCourseAI.exe` 16,472,827 bytes).*
