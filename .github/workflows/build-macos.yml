@@ -2,6 +2,14 @@ name: macOS Paketi
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Paketin yükleneceği sürüm etiketi (ör. v1.3.0). Boş bırakılırsa yalnızca artifact üretilir."
+        required: false
+        default: ''
+
+permissions:
+  contents: write
 
 jobs:
   macos:
@@ -15,8 +23,20 @@ jobs:
       - name: macOS uygulamasını oluştur
         run: |
           chmod +x build_macos.sh && ./build_macos.sh
+      - name: Paketi sürüme yükle
+        if: ${{ inputs.release_tag != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ inputs.release_tag }}" dist/FrenchCourseAI-macOS.zip \
+            --clobber -R "${{ github.repository }}"
+      # Artifact deposu hesap genelinde bir kotaya tabidir; kota dolduğunda bu adım
+      # başarısız olur. Paket yukarıdaki adımda sürüme yüklendiği için bu, derlemeyi
+      # düşürmemelidir.
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: FrenchCourseAI-macOS
           path: dist/FrenchCourseAI-macOS.zip
           if-no-files-found: error
+          retention-days: 7
