@@ -98,3 +98,10 @@ grammar/                offline grammar notes
 Resources/              learner-owned course files
 docs/presentation/      editable PPTX, PDF and screenshots
 ```
+
+## License
+
+French Course AI is distributed under the **MIT License**; the full text is in [LICENSE](LICENSE).
+Every third-party component the app uses or embeds in the published packages is listed with its real
+licence in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Openly licensed material opened from the
+Resource Center keeps its own licence and is never bundled in this repository.

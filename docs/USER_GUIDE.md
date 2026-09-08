@@ -15,6 +15,7 @@ Version 1.2.1 · Windows and macOS desktop app · Interface languages: Türkçe,
 - [9. Troubleshooting](#9-troubleshooting)
 - [10. Release notes summary](#10-release-notes-summary)
 - [11. Frequently asked questions](#11-frequently-asked-questions)
+- [12. Licence](#12-licence)
 
 ---
 
@@ -37,13 +38,13 @@ There is no installer, no Python requirement and no need for administrator right
 3. Double-click `FrenchCourseAI.exe`; nothing is installed, the app simply opens.
 4. If SmartScreen warns you, choose **More info → Run anyway**.
 
-The zip holds only `FrenchCourseAI.exe`; the `assets`, `Resources` and `grammar` folders are bundled inside the executable. Still extract the zip into a folder and run the .exe from there.
+The zip holds three files: `FrenchCourseAI.exe`, `LICENSE` and `THIRD_PARTY_NOTICES.md`. The `assets`, `Resources` and `grammar` folders are bundled inside the executable; the two licence files sit both next to the .exe and inside it. Extract the zip into a folder and run the .exe from there.
 
 ### 2.2 macOS (zip, Apple Silicon)
 
 The `FrenchCourseAI-macOS.zip` package is built for Apple Silicon (arm64) and is **not notarized**:
 
-1. Double-click the zip and move `FrenchCourseAI.app` into your **Applications** folder.
+1. Double-click the zip and move `FrenchCourseAI.app` into your **Applications** folder. (The zip also carries `LICENSE` and `THIRD_PARTY_NOTICES.md` beside the app; the same texts are copied inside the `.app` bundle as well.)
 2. **Right-click** the app (or Control-click it) and choose **Open**.
 3. Press **Open** again in the warning dialog.
 
@@ -430,3 +431,18 @@ Other tips:
 **Which model should I install?** `qwen2.5-7b-instruct` is a good starting point; instruct models of 4-16 billion parameters are both fast enough and good enough.
 
 **Will uninstalling the app delete my data?** No. Removing the program folder leaves the data folder untouched; to delete the data as well, remove `%APPDATA%\FrenchCourseAI` by hand.
+
+## 12. Licence
+
+French Course AI is distributed under the **MIT License**. The full text is in `LICENSE`, which you
+get both at the repository root and beside the application in the download: you may use, copy, modify
+and redistribute the program freely, the single condition being that the copyright and licence notice
+travels with the copies. The software comes with no warranty of any kind.
+
+Every third-party component the app uses, and everything embedded in the Windows and macOS packages —
+pypdf for PDF text, Tcl/Tk for the interface, the Python runtime, OpenSSL, SQLite and the rest — is
+listed with its real licence in `THIRD_PARTY_NOTICES.md`, which ships in the same two places.
+
+The Wikibooks, Tatoeba, LibriVox and Project Gutenberg links in the Resource Center only open in your
+browser; anything you download keeps the licence of its own source and is not redistributed with the
+application. Your own course files in the `Resources` folder likewise stay on your machine.

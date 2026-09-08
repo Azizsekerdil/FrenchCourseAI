@@ -4,7 +4,8 @@ from pathlib import Path
 root = Path(SPEC).resolve().parent
 a = Analysis(
     [str(root / "French_Course_AI.pyw")], pathex=[str(root)], binaries=[],
-    datas=[(str(root / "assets"), "assets"), (str(root / "Resources"), "Resources"), (str(root / "grammar"), "grammar")],
+    datas=[(str(root / "assets"), "assets"), (str(root / "Resources"), "Resources"), (str(root / "grammar"), "grammar"),
+           (str(root / "LICENSE"), "."), (str(root / "THIRD_PARTY_NOTICES.md"), ".")],
     hiddenimports=["pypdf", "fca.secrets", "fca.dictionary", "fca.dict_data", "fca.tabs.dictionary"], hookspath=[], hooksconfig={}, runtime_hooks=[], excludes=[], noarchive=False,
 )
 pyz = PYZ(a.pure)

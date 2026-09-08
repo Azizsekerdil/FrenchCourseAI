@@ -106,3 +106,10 @@ docs/presentation/      Düzenlenebilir PPTX, PDF ve ekran görüntüleri
 ## Açık kaynak kataloğu
 
 Katalog bağlantı sunar; içeriği izinsiz paketlemez. Wikibooks (CC BY-SA), Tatoeba (CC BY 2.0 FR / seçili CC0), LibriVox ve Project Gutenberg kamu malı koleksiyonları lisans ve atıf bilgisiyle gösterilir. Kamu malı durumu ülkeye göre değişebileceğinden uyarılar korunur.
+
+## Lisans
+
+French Course AI **MIT Lisansı** ile dağıtılır; tam metin [LICENSE](LICENSE) dosyasındadır.
+Uygulamanın kullandığı ve yayımlanan paketlerin içine giren üçüncü taraf bileşenlerin tamamı,
+gerçek lisanslarıyla birlikte [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) dosyasında listelenir.
+Kaynak Merkezi'nden açılan açık lisanslı materyaller kendi lisanslarını korur ve bu depoda paketlenmez.

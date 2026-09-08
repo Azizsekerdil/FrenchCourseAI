@@ -15,6 +15,7 @@ Sürüm 1.2.1 · Windows ve macOS masaüstü uygulaması · Arayüz dilleri: Tü
 - [9. Sorun giderme](#9-sorun-giderme)
 - [10. Sürüm notları özeti](#10-sürüm-notları-özeti)
 - [11. Sık sorulan sorular](#11-sık-sorulan-sorular)
+- [12. Lisans](#12-lisans)
 
 ---
 
@@ -37,13 +38,13 @@ Kurulum sihirbazı, Python ya da yönetici hakkı gerekmez; paketler taşınabil
 3. `FrenchCourseAI.exe` dosyasına çift tıklayın; kurulum yapılmaz, uygulama doğrudan açılır.
 4. SmartScreen uyarısı çıkarsa **Ek bilgi → Yine de çalıştır** deyin.
 
-Zip yalnızca `FrenchCourseAI.exe` dosyasını içerir; `assets`, `Resources` ve `grammar` klasörleri .exe'nin içine paketlenmiştir. Yine de zip'i önce bir klasöre ayıklayın ve .exe'yi oradan çalıştırın.
+Zip üç dosya içerir: `FrenchCourseAI.exe`, `LICENSE` ve `THIRD_PARTY_NOTICES.md`. `assets`, `Resources` ve `grammar` klasörleri .exe'nin içine paketlenmiştir; iki lisans dosyası hem .exe'nin yanında hem de içinde bulunur. Zip'i önce bir klasöre ayıklayın ve .exe'yi oradan çalıştırın.
 
 ### 2.2 macOS (zip, Apple Silicon)
 
 `FrenchCourseAI-macOS.zip` paketi Apple Silicon (arm64) içindir ve **notarize edilmemiştir**:
 
-1. Zip'e çift tıklayıp `FrenchCourseAI.app` paketini **Uygulamalar** klasörüne taşıyın.
+1. Zip'e çift tıklayıp `FrenchCourseAI.app` paketini **Uygulamalar** klasörüne taşıyın. (Zip'te uygulamanın yanında `LICENSE` ve `THIRD_PARTY_NOTICES.md` dosyaları da vardır; aynı metinler `.app` paketinin içine de kopyalanır.)
 2. Uygulamaya **sağ tıklayın** (ya da Control ile tıklayın) ve **Aç** seçin.
 3. Uyarı penceresinde yine **Aç** düğmesine basın.
 
@@ -430,3 +431,20 @@ Diğer ipuçları:
 **Hangi modeli kurmalıyım?** `qwen2.5-7b-instruct` iyi bir başlangıçtır; 4-16 milyar parametreli instruct modelleri hem hızlı hem yeterlidir.
 
 **Uygulamayı kaldırırsam verilerim silinir mi?** Hayır. Program klasörünü silmek veri klasörüne dokunmaz; verileri de silmek isterseniz `%APPDATA%\FrenchCourseAI` klasörünü elle kaldırın.
+
+## 12. Lisans
+
+French Course AI **MIT Lisansı** ile dağıtılır. Tam metin `LICENSE` dosyasındadır; bu dosyayı hem depo
+kökünde hem de indirdiğiniz paketin içinde uygulamanın yanında bulursunuz. Programı özgürce
+kullanabilir, kopyalayabilir, değiştirebilir ve dağıtabilirsiniz; tek koşul telif ve lisans
+bildiriminin kopyalarla birlikte kalmasıdır. Yazılım hiçbir garanti verilmeksizin "olduğu gibi"
+sunulur.
+
+Uygulamanın kullandığı ve Windows ile macOS paketlerinin içine giren üçüncü taraf bileşenler — PDF
+metni için pypdf, arayüz için Tcl/Tk, Python çalışma zamanı, OpenSSL, SQLite ve diğerleri — gerçek
+lisanslarıyla birlikte `THIRD_PARTY_NOTICES.md` dosyasında listelenir; o dosya da aynı iki yerde
+bulunur.
+
+Kaynak Merkezi'ndeki Wikibooks, Tatoeba, LibriVox ve Project Gutenberg bağlantıları yalnız tarayıcınızda
+açılır; indirdiğiniz her materyal kendi lisansını korur ve uygulamayla birlikte dağıtılmaz. `Resources`
+klasörüne koyduğunuz kendi ders dosyalarınız da bilgisayarınızda kalır.
