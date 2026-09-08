@@ -1,6 +1,13 @@
 # French Course AI
 
-French Course AI is an independent Windows desktop learning app built around local-first student data. Its Turkish, English and French interfaces expose the same feature set and French-specific content.
+[![release](https://img.shields.io/github/v/release/Azizsekerdil/FrenchCourseAI?display_name=tag&sort=semver&label=release&color=2ea44f)](https://github.com/Azizsekerdil/FrenchCourseAI/releases/latest)
+[![license MIT](https://img.shields.io/github/license/Azizsekerdil/FrenchCourseAI?label=license&color=blue)](LICENSE)
+[![platform Windows and macOS](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-0078D4)](https://github.com/Azizsekerdil/FrenchCourseAI/releases/latest)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB)](https://www.python.org/downloads/)
+
+[Türkçe](README.md) | **English**
+
+French Course AI is an independent desktop learning app for Windows and macOS, built around local-first student data. Its Turkish, English and French interfaces expose the same feature set and French-specific content.
 
 > Core learning features and student data are local. Opening resource links and using optional remote services requires the internet, so the app does not make a misleading “100% offline” claim.
 
@@ -25,6 +32,22 @@ French Course AI is an independent Windows desktop learning app built around loc
 - Weekly progress report, light/dark themes and learner profiles
 - Unicode CSV and `.fcapack` import/export
 
+## Download
+
+Grab a ready-made package and run it directly — no Python installation required.
+
+| Package | Link |
+| --- | --- |
+| Windows app (ZIP) | [FrenchCourseAI-Windows.zip](https://github.com/Azizsekerdil/FrenchCourseAI/releases/latest/download/FrenchCourseAI-Windows.zip) |
+| macOS app (ZIP, Apple Silicon) | [FrenchCourseAI-macOS.zip](https://github.com/Azizsekerdil/FrenchCourseAI/releases/latest/download/FrenchCourseAI-macOS.zip) |
+| User guide (PDF, Turkish) | [FrenchCourseAI-Kullanim-Kilavuzu.pdf](https://github.com/Azizsekerdil/FrenchCourseAI/releases/latest/download/FrenchCourseAI-Kullanim-Kilavuzu.pdf) |
+
+These links always resolve to the [latest release](https://github.com/Azizsekerdil/FrenchCourseAI/releases/latest); every version and its release notes live on the Releases page.
+
+The macOS package is an Apple Silicon build and is **not notarized**. On first launch, right-click `FrenchCourseAI.app`, choose **Open** and confirm the warning; after that a normal double-click works.
+
+To run from source instead, see below.
+
 ## Install and run from source
 
 Requires Python 3.11 or newer.
@@ -38,14 +61,26 @@ python .\French_Course_AI.pyw
 
 User data is stored under `%APPDATA%\FrenchCourseAI`. Set `FCA_HOME` to an isolated folder for testing or portable evaluation.
 
-## Build the Windows EXE
+## Build the packages (Windows and macOS)
+
+Windows:
 
 ```powershell
 python -m pip install -r requirements-dev.txt
 .\build.bat
 ```
 
-Output: `dist\FrenchCourseAI.exe`. Build output and user data are excluded from Git.
+Output: `dist\FrenchCourseAI.exe`.
+
+macOS (must be run on a Mac):
+
+```bash
+./build_macos.sh
+```
+
+Output: `dist/FrenchCourseAI.app` and the distribution archive `dist/FrenchCourseAI-macOS.zip`.
+
+Build output and user data are excluded from Git.
 
 ## Local AI
 

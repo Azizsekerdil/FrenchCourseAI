@@ -1,6 +1,13 @@
 # French Course AI
 
-French Course AI, Fransızca öğrenimi için yerel veriyi önceleyen bağımsız bir Windows masaüstü uygulamasıdır. Türkçe, English ve Français arayüzleri aynı özellik derinliğini sunar; kelime, aksan, telaffuz ve dilbilgisi içeriği Fransızca için özgün hazırlanmıştır.
+[![sürüm](https://img.shields.io/github/v/release/Azizsekerdil/FrenchCourseAI?display_name=tag&sort=semver&label=s%C3%BCr%C3%BCm&color=2ea44f)](https://github.com/Azizsekerdil/FrenchCourseAI/releases/latest)
+[![lisans MIT](https://img.shields.io/github/license/Azizsekerdil/FrenchCourseAI?label=lisans&color=blue)](LICENSE)
+[![platform Windows ve macOS](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-0078D4)](https://github.com/Azizsekerdil/FrenchCourseAI/releases/latest)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB)](https://www.python.org/downloads/)
+
+**Türkçe** | [English](README.en.md)
+
+French Course AI, Fransızca öğrenimi için yerel veriyi önceleyen, Windows ve macOS için dağıtılan bağımsız bir masaüstü uygulamasıdır. Türkçe, English ve Français arayüzleri aynı özellik derinliğini sunar; kelime, aksan, telaffuz ve dilbilgisi içeriği Fransızca için özgün hazırlanmıştır.
 
 > Temel çalışma özellikleri ve öğrenci verileri yereldir. Kaynak bağlantılarını açmak ve isteğe bağlı uzak servisleri kullanmak internet gerektirir; uygulama bu nedenle yanıltıcı bir “%100 çevrimdışı” iddiasında bulunmaz.
 
@@ -25,6 +32,22 @@ French Course AI, Fransızca öğrenimi için yerel veriyi önceleyen bağımsı
 - Haftalık ilerleme raporu, açık/koyu tema ve öğrenci profilleri
 - Unicode CSV ve `.fcapack` paket içe/dışa aktarımı
 
+## İndirme
+
+Hazır paketi indirip doğrudan çalıştırabilirsiniz; bunun için Python kurulumu gerekmez.
+
+| Paket | Bağlantı |
+| --- | --- |
+| Windows uygulaması (ZIP) | [FrenchCourseAI-Windows.zip](https://github.com/Azizsekerdil/FrenchCourseAI/releases/latest/download/FrenchCourseAI-Windows.zip) |
+| macOS uygulaması (ZIP, Apple Silicon) | [FrenchCourseAI-macOS.zip](https://github.com/Azizsekerdil/FrenchCourseAI/releases/latest/download/FrenchCourseAI-macOS.zip) |
+| Kullanım kılavuzu (PDF) | [FrenchCourseAI-Kullanim-Kilavuzu.pdf](https://github.com/Azizsekerdil/FrenchCourseAI/releases/latest/download/FrenchCourseAI-Kullanim-Kilavuzu.pdf) |
+
+Bağlantılar her zaman [en güncel sürümü](https://github.com/Azizsekerdil/FrenchCourseAI/releases/latest) indirir; tüm sürümler ve sürüm notları Sürümler sayfasındadır.
+
+macOS paketi notarize **edilmemiş** bir Apple Silicon paketidir. İlk açılışta `FrenchCourseAI.app` dosyasına sağ tıklayıp **Aç** deyin ve çıkan uyarıyı onaylayın; sonraki açılışlar normal çift tıklamayla çalışır.
+
+Kaynaktan çalıştırmak isterseniz aşağıya bakın.
+
 ## Kurulum ve kaynaktan çalıştırma
 
 Gereksinim: Python 3.11 veya üzeri.
@@ -38,14 +61,26 @@ python .\French_Course_AI.pyw
 
 Öğrenci verileri `%APPDATA%\FrenchCourseAI` altında tutulur. Test veya taşınabilir deneme için `FCA_HOME` ortam değişkeniyle ayrı bir klasör seçilebilir.
 
-## Windows EXE üretimi
+## Paket üretimi (Windows ve macOS)
+
+Windows:
 
 ```powershell
 python -m pip install -r requirements-dev.txt
 .\build.bat
 ```
 
-Çıktı: `dist\FrenchCourseAI.exe`. `build`, `dist` ve kullanıcı verileri Git deposuna alınmaz.
+Çıktı: `dist\FrenchCourseAI.exe`.
+
+macOS (bir Mac üzerinde çalıştırılmalıdır):
+
+```bash
+./build_macos.sh
+```
+
+Çıktı: `dist/FrenchCourseAI.app` ve dağıtım arşivi `dist/FrenchCourseAI-macOS.zip`.
+
+`build`, `dist` ve kullanıcı verileri Git deposuna alınmaz.
 
 ## Yerel AI kurulumu
 
