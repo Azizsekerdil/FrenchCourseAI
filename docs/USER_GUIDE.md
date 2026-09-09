@@ -68,7 +68,8 @@ To build your own `.exe`, run `python -m pip install -r requirements-dev.txt` an
 | Platform | Data folder |
 | --- | --- |
 | Windows | `%APPDATA%\FrenchCourseAI` |
-| macOS / Linux | `~/.frenchcourseai` |
+| macOS | `~/Library/Application Support/FrenchCourseAI` |
+| Linux | `~/.frenchcourseai` |
 
 Four subfolders are created inside it: `data` (the SQLite database `FrenchCourseAI.db`), `settings` (`settings.json`, plus `secrets.json` when needed), `exports` and `downloads`.
 
@@ -397,7 +398,7 @@ Other tips:
 
 **The .exe does not start.** It may have been run from inside the zip, blocked by SmartScreen, or quarantined by antivirus software. Extract the zip into a folder, choose **More info → Run anyway** at the SmartScreen prompt, and add a folder exception in your antivirus if needed. If it still fails, run `python .\French_Course_AI.pyw` from source to see the error message.
 
-**Where is my data?** `%APPDATA%\FrenchCourseAI` on Windows, `~/.frenchcourseai` on macOS/Linux; the full path is always printed at the bottom of the **Offline Guide** page. With `FCA_HOME` set, the data lives there instead — and deleting the app does not delete that folder.
+**Where is my data?** `%APPDATA%\FrenchCourseAI` on Windows, `~/Library/Application Support/FrenchCourseAI` on macOS, `~/.frenchcourseai` on Linux; the full path is always printed at the bottom of the **Offline Guide** page. With `FCA_HOME` set, the data lives there instead — and deleting the app does not delete that folder.
 
 ## 10. Release notes summary
 

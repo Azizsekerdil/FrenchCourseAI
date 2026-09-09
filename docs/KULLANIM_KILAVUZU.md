@@ -68,7 +68,8 @@ Kendi `.exe` dosyanız için `python -m pip install -r requirements-dev.txt` ard
 | Platform | Veri klasörü |
 | --- | --- |
 | Windows | `%APPDATA%\FrenchCourseAI` |
-| macOS / Linux | `~/.frenchcourseai` |
+| macOS | `~/Library/Application Support/FrenchCourseAI` |
+| Linux | `~/.frenchcourseai` |
 
 İçinde dört alt klasör oluşur: `data` (SQLite veritabanı `FrenchCourseAI.db`), `settings` (`settings.json`, gerekirse `secrets.json`), `exports` ve `downloads`.
 
@@ -397,7 +398,7 @@ Diğer ipuçları:
 
 **.exe açılmıyor.** Zip ayıklanmadan çalıştırılmış, SmartScreen engellemiş ya da antivirüs karantinaya almış olabilir. Zip'i bir klasöre ayıklayın, SmartScreen uyarısında **Ek bilgi → Yine de çalıştır** deyin, gerekirse antivirüse klasör istisnası tanımlayın. Sorun sürerse `python .\French_Course_AI.pyw` ile kaynaktan çalıştırıp hata iletisini görün.
 
-**Verilerim nerede?** Windows'ta `%APPDATA%\FrenchCourseAI`, macOS/Linux'ta `~/.frenchcourseai`; tam yol **Çevrimdışı Kılavuz** sayfasının en altında yazılıdır. `FCA_HOME` tanımlıysa veriler orada durur ve uygulamayı silmek bu klasörü silmez.
+**Verilerim nerede?** Windows'ta `%APPDATA%\FrenchCourseAI`, macOS'ta `~/Library/Application Support/FrenchCourseAI`, Linux'ta `~/.frenchcourseai`; tam yol **Çevrimdışı Kılavuz** sayfasının en altında yazılıdır. `FCA_HOME` tanımlıysa veriler orada durur ve uygulamayı silmek bu klasörü silmez.
 
 ## 10. Sürüm notları özeti
 
