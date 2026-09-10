@@ -1,0 +1,52 @@
+name: Windows Paketi
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Paketin yükleneceği sürüm etiketi (ör. v1.3.1). Boş bırakılırsa yalnızca artifact üretilir."
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      # v1.3.0'dan itibaren paket TEMIZ bir sanal ortamda derlenir; build.bat
+      # hazır yorumlayıcıyı BUILD_PYTHON değişkeninden alır ve kendi ortamını
+      # kurmaz. Böylece .exe yalnızca requirements.txt'teki kütüphaneleri taşır.
+      - name: Temiz derleme ortamı
+        run: |
+          python -m venv build-venv
+          .\build-venv\Scripts\python.exe -m pip install --upgrade pip
+          .\build-venv\Scripts\python.exe -m pip install -r requirements.txt
+          .\build-venv\Scripts\python.exe -m pip install pyinstaller
+      - name: Windows paketini oluştur
+        env:
+          BUILD_PYTHON: ${{ github.workspace }}\build-venv\Scripts\python.exe
+        run: .\build.bat
+      - name: Paketi sürüme yükle
+        if: ${{ inputs.release_tag != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ inputs.release_tag }}" dist/FrenchCourseAI-Windows.zip `
+            --clobber -R "${{ github.repository }}"
+      # Artifact deposu hesap genelinde bir kotaya tabidir; kota dolduğunda bu adım
+      # başarısız olur. Paket yukarıdaki adımda sürüme yüklendiği için bu, derlemeyi
+      # düşürmemelidir.
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: FrenchCourseAI-Windows
+          path: dist/FrenchCourseAI-Windows.zip
+          if-no-files-found: error
+          retention-days: 7
